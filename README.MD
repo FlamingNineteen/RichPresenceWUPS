@@ -1,6 +1,6 @@
 # Wii U Rich Presence Plugin
 
-This plugin uses FTP to communicate with an application on your computer to set Discord Rich Presence for the user. The activity is set based on the application currently being played, the time the application was loaded, and the amount of controllers connected.
+This application communicates with an FTP server run by your Wii U to set Discord Rich Presence for the user. The activity is set based on the application currently being played, the time the application was loaded, and the amount of controllers connected.
 
 ## Installation
 (`[ENVIRONMENT]` is a placeholder for the actual environment namev.)
@@ -16,5 +16,13 @@ Make sure ftpiiu is installed and enabled. Run `WiiURichPresence` in the `WURPdi
 ## Building
 
 For building you need:
-- [wut](https://github.com/decaf-emu/wut)
-- [wups](https://github.com/wiiu-env/WiiUPluginSystem)
+- Discord Social SDK
+
+It is also recommended to build in the Visual Studio Development Console.
+
+In the root of this folder, create a new directory named `lib` and add the `discord_social_sdk` to the directory. Then run the following commands:
+```
+mkdir build && cd build
+cmake ..
+cmake --build .
+```
