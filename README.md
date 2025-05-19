@@ -5,8 +5,8 @@ This plugin uses FTP to communicate with an application on your computer to set 
 ## Installation
 (`[ENVIRONMENT]` is a placeholder for the actual environment name.)
 
-1. Download both wurpWiiU.zip and wurpDiscord.zip and extract both of them.
-2. From wurpWiiU, copy the file `RichPresence.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
+1. Download both `wurpWiiU.zip` and `wurpDiscord.zip` and extract both of them.
+2. From `wurpWiiU`, copy the file `RichPresence.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
 3. Requires the [ftpiiu plugin](https://github.com/wiiu-env/ftpiiu_plugin) in `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
 4. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
 5. Keep the `wurpDiscord` folder on your computer.
