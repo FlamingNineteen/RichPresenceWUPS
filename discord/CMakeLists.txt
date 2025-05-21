@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 
-add_executable(WiiURichPresence main.cpp)
+add_executable(WiiURichPresence main.cpp app.rc)
 
 # Define some handy Social SDK variables
 set(DISCORD_SDK_ROOT "${CMAKE_SOURCE_DIR}/lib/discord_social_sdk")
