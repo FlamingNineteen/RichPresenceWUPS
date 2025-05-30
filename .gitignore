@@ -1,0 +1,12 @@
+discord/.vscode/
+discord/build/
+discord/lib/
+wiiu/build/
+wiiu/.vscode/
+resources/
+archive/
+*bat
+*lnk
+*html
+*elf
+*wps
