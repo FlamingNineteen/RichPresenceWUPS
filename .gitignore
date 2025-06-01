@@ -1,8 +1,11 @@
 discord/.vscode/
 discord/build/
+discord/include/
 discord/lib/
+discord/app/
 wiiu/build/
 wiiu/.vscode/
+.vscode/
 resources/
 archive/
 *bat
@@ -10,3 +13,4 @@ archive/
 *html
 *elf
 *wps
+*json

@@ -15,6 +15,7 @@ set(DISCORD_SDK_INCLUDE_DIR "${DISCORD_SDK_ROOT}/include")
 
 # Include for Social SDK headers
 target_include_directories(WiiURichPresence PRIVATE ${DISCORD_SDK_INCLUDE_DIR})
+target_include_directories(WiiURichPresence PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
 # Platform-specific Social SDK library paths
 if(WIN32)
