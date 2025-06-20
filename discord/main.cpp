@@ -2,6 +2,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "wininet.lib")
+#pragma comment(lib, "Shlwapi.lib")
 #include "discordpp.h"
 #include <iostream>
 #include <thread>
@@ -12,10 +13,15 @@
 #include <fstream>
 #include <windows.h>
 #include <wininet.h>
+#include <shlobj.h>
+#include <shlwapi.h>
+#include <shobjidl.h>
+#include <objbase.h>
 #include <vector>
 #include <ctime>
 #include <future>
 #include "json.hpp"
+#include "resource.h"
 using json = nlohmann::json;
 
 // Replace with your Discord Application ID
@@ -224,9 +230,120 @@ time_t AdjustEpochToUTC(time_t localEpoch) {
     return utcEpoch;
 }
 
-int main() {
+void ToTray() {
+  HINSTANCE hInstance       = GetModuleHandle(NULL);
+  NOTIFYICONDATA icondata   = {0};
+  icondata.cbSize           = sizeof(NOTIFYICONDATA);
+  icondata.hWnd             = GetConsoleWindow();
+  icondata.uID              = 1;
+  icondata.uFlags           = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+  icondata.uCallbackMessage = WM_USER + 1;
+  icondata.hIcon            = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON));
+  strcpy(icondata.szTip, "Wii U Rich Presence");
+
+  ShowWindow(GetConsoleWindow(), SW_HIDE);
+  Shell_NotifyIcon(NIM_ADD, &icondata);
+}
+
+int CreateStartupShortcut() {
+  HRESULT hr;
+  WCHAR startupPath[MAX_PATH];
+  PWSTR pszPath = NULL;
+
+  // Get the Startup folder path and app path
+  hr = SHGetKnownFolderPath(FOLDERID_Startup, 0, NULL, &pszPath);
+  if (FAILED(hr)) return 1;
+
+  WCHAR exePath[MAX_PATH];
+  GetModuleFileNameW(NULL, exePath, MAX_PATH);
+
+  wsprintfW(startupPath, L"%s\\WURP.lnk", pszPath);
+  CoTaskMemFree(pszPath);
+
+  if (PathFileExistsW(startupPath)) {
+    // Shortcut already exists
+    return 0;
+  }
+
+  // Initialize COM and create the shortcut
+  CoInitialize(NULL);
+  IShellLinkW* pShellLink;
+  hr = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER,
+                                IID_IShellLinkW, (void**)&pShellLink);
+
+  if (SUCCEEDED(hr)) {
+    pShellLink->SetPath(exePath);
+    pShellLink->SetDescription(L"Wii U Rich Presence startup");
+
+    IPersistFile* pPersistFile;
+    hr = pShellLink->QueryInterface(IID_IPersistFile, (void**)&pPersistFile);
+    if (SUCCEEDED(hr)) {
+      pPersistFile->Save(startupPath, TRUE);
+      pPersistFile->Release();
+    }
+    pShellLink->Release();
+  }
+
+  CoUninitialize();
+}
+
+int main(int argc, char* argv[]) {
   json fjs;
   std::ifstream fif("save.json");
+
+  // Command line inputs
+  if (argc > 1) {
+    if (!fif.good()) {
+      std::cerr << "save.json does not exist." << std::endl;
+      return 0;
+    }
+
+    try {
+      fjs = json::parse(fif);
+    } catch (const std::exception& e) {
+      std::cerr << "Failed to parse save.json: " << e.what() << std::endl;
+      return 0;
+    }
+
+    int skipsave = true;
+    for (int i = 2; i <= argc; i+= 2) {
+      int c = i - 1;
+      try {
+        if (strcmp(argv[c], "server") == 0) {
+          fjs["server"] = (argv[i]); skipsave = false;
+          std::cout << "Set server to " << argv[i] << std::endl;
+        }
+        else if (strcmp(argv[c], "time") == 0) {
+          fjs["time"] = std::stoi(argv[i]); skipsave = false;
+          std::cout << "Set time to " << argv[i] << std::endl;
+        }
+        else if (strcmp(argv[c], "logging") == 0 || strcmp(argv[c], "tray") == 0 || strcmp(argv[c], "startup") == 0) {
+          fjs[argv[c]] = static_cast<bool>(argv[i]); skipsave = false;
+          std::cout << "Set " << argv[c] << " to " << argv[i] << std::endl;
+        }
+        else {
+          std::cerr << "Invalid setting \"" << argv[c] << "\"" << std::endl;
+        }
+      }
+      catch (const std::exception& e) {
+        std::cerr << "Failed to save setting \"" << argv[c] << "\" : " << e.what() << std::endl;
+      }
+    }
+
+    if (!skipsave) {
+      save(fjs);
+      std::cout << "Settings saved successfully. Run the app?\n(y/n): ";
+      std::string answer;
+      std::cin >> answer;
+      if (answer == "n") {return 0;}
+    }
+    else {
+      std::cout << "Unable to save settings: errors occured!" << std::endl;
+      return 1;
+    }
+    std::cout << std::endl;
+  }
+
   bool auth =      true;
   bool logging =   false;
 
@@ -239,14 +356,22 @@ int main() {
         logging = fjs["logging"];
     } catch (const std::exception& e) {
         std::cerr << "Failed to parse save.json: " << e.what() << "\n" << std::endl;
-        fjs = json::parse(R"({"server":"","time":0,"auth":true,"logging":false,"cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
+        fjs = json::parse(R"({"server":"","time":0,"auth":true,"logging":false,"tray":false,"startup":false,"cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
         save(fjs);
         auth = true;
         logging = false;
     }
   } else {
-    fjs = json::parse(R"({"server":"","time":0,"auth":true,"logging":false,"cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
+    fjs = json::parse(R"({"server":"","time":0,"auth":true,"logging":false,"tray":false,"startup":false,"cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
     save(fjs);
+  }
+
+  if (fjs["tray"]) {
+    ToTray();
+  }
+
+  if (fjs["startup"]) {
+    CreateStartupShortcut();
   }
 
   std::signal(SIGINT, signalHandler);
@@ -279,12 +404,12 @@ int main() {
       auth = !Authorize(client, fjs);
     } else {
       std::this_thread::sleep_for(std::chrono::seconds(5));
-      std::string accessToken =                     fjs["cache"]["accessToken"];
-      std::string refreshToken =                    fjs["cache"]["refreshToken"];
+      std::string accessToken                     = fjs["cache"]["accessToken"];
+      std::string refreshToken                    = fjs["cache"]["refreshToken"];
       discordpp::AuthorizationTokenType tokenType = discordpp::AuthorizationTokenType::Bearer;
-      int32_t expiresIn =                           fjs["cache"]["expiresIn"];
-      std::string scope =                           fjs["cache"]["scope"];
-      int step =                                    0;
+      int32_t expiresIn                           = fjs["cache"]["expiresIn"];
+      std::string scope                           = fjs["cache"]["scope"];
+      int step                                    = 0;
 
       if (SyncUpdateToken(client, tokenType, accessToken)) {
         client->Connect();
@@ -337,8 +462,22 @@ int main() {
     std::cout << "\nThanks for using Wii U Rich Presence.\nThis plugin is dependent on the ftpiiu plugin. Confirm that it is enabled.\n\nPlease input your Wii U's IP address.\nThis can be found in ftpiiu's plugin configuration settings.\nDo not include the port number.\nType here: ";
     std::cin >> ip;
     fjs["server"] = ip;
-    save(fjs);
     std::cout << "The FTP address has been saved.\n";
+
+    std::string answer;
+
+    std::cout << "\nWould you like to have this app start when your computer starts up?\n(y/n): ";
+    std::cin >> answer;
+    if (answer == "n") {fjs["startup"] = false;}
+    else {fjs["startup"] = true; CreateStartupShortcut(); std::cout << "App startup has been enabled." << std::endl;}
+
+    std::cout << "\nWould you like to have the app minimize to system tray when ran?\n(y/n): ";
+    std::cin >> answer;
+    if (answer == "n") {fjs["tray"] = false;}
+    else {fjs["tray"] = true; std::cout << "Minimizing to tray has been enabled. It will minimize on next use.\n" << std::endl;}
+
+    std::cout << std::endl;
+    save(fjs);
   }
   
   if (fjs["time"] == 0) {

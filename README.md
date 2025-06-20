@@ -16,5 +16,22 @@ Make sure ftpiiu is installed and enabled. Run `WiiURichPresence` in the `wurpDi
 
 Elapsed time may not show up correctly because of your Wii U's time. To offset the elapsed time that shows up in Discord by a certain amount of hours, close the program, open the `save.json` in the `wurpDiscord` folder with a text editor, and change the `time` key to a number between -12 and 12.
 
+## Settings
+The Wii U plugin has no settings.
+
+The `WiiURichPresence` application creates a `save.json` file when ran. Here, settings can be changed:
+- `server` (string): The IPv4 address of your Wii U.
+- `time` (integer): A value from -12 to 12 to offset the hours when displaying elapsed time in Discord.
+- `logging` (boolean): Toggle Discord logs
+- `startup` (boolean): Toggle automatic startup when your device starts up.
+- `tray` (boolean): Toggle minimizing to system tray on startup.
+
+Other keys are used for authentication and should not be edited manually.
+
+Additionally, the above settings can be changed by running the application in a command line. For example, the below command will change the values of the `time` and `logging` settings:
+```
+WiiURichPresence time 1 logging true
+```
+
 ## Building
 For specifics on building either the plugin or the executable, please check the respective directories.

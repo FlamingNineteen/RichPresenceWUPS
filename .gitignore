@@ -5,6 +5,7 @@ discord/lib/
 discord/app/
 wiiu/build/
 wiiu/.vscode/
+build/
 .vscode/
 resources/
 archive/
