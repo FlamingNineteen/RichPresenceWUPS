@@ -1,27 +1,18 @@
 #define DISCORDPP_IMPLEMENTATION
 #define _CRT_SECURE_NO_WARNINGS
-#pragma comment(lib, "Ws2_32.lib")
-#pragma comment(lib, "wininet.lib")
-#pragma comment(lib, "Shlwapi.lib")
-#include "discordpp.h"
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#pragma comment(lib, "ws2_32.lib")
 #include <iostream>
 #include <thread>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <atomic>
 #include <string>
-#include <functional>
 #include <csignal>
 #include <fstream>
-#include <windows.h>
-#include <wininet.h>
-#include <shlobj.h>
-#include <shlwapi.h>
-#include <shobjidl.h>
-#include <objbase.h>
-#include <vector>
-#include <ctime>
 #include <future>
+#include "discordpp.h"
 #include "json.hpp"
-#include "resource.h"
 using json = nlohmann::json;
 
 // Replace with your Discord Application ID
@@ -174,50 +165,6 @@ bool Authorize(std::shared_ptr<discordpp::Client> client, json &fjs) {
   return authFuture.get();
 }
 
-// FTP server function
-int ReadFileFromFTP(const std::wstring& server, const std::wstring& remoteFile, std::string& fileContent) {
-  std::cout << "\n";  
-  
-  HINTERNET hInternet = InternetOpenW(L"FTP Client", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, INTERNET_FLAG_RELOAD);
-    if (!hInternet) {
-        std::wcerr << L"InternetOpen failed. Error: " << GetLastError() << std::endl;
-        return 1;
-    }
-
-    HINTERNET hFtpSession = InternetConnectW(hInternet, server.c_str(), INTERNET_DEFAULT_FTP_PORT, NULL, NULL, INTERNET_SERVICE_FTP, 0, 0);
-    if (!hFtpSession) {
-        std::wcerr << L"InternetConnect failed: " << server << L". Error: " << GetLastError() << std::endl;
-        InternetCloseHandle(hInternet);
-        return 1;
-    }
-
-    // Open the remote file with INTERNET_FLAG_RELOAD to bypass caching
-    HINTERNET hFile = FtpOpenFileW(hFtpSession, remoteFile.c_str(), GENERIC_READ, FTP_TRANSFER_TYPE_BINARY | INTERNET_FLAG_RELOAD, 0);
-    if (!hFile) {
-        std::wcerr << L"FtpOpenFile failed. Error: " << GetLastError() << std::endl;
-        InternetCloseHandle(hFtpSession);
-        InternetCloseHandle(hInternet);
-        return 1;
-    }
-
-    // Read the file content into a buffer
-    char buffer[400];
-    DWORD bytesRead;
-    fileContent.clear();
-
-    while (InternetReadFile(hFile, buffer, sizeof(buffer), &bytesRead) && bytesRead > 0) {
-        fileContent.append(buffer, bytesRead);
-    }
-
-    // Clean up
-    InternetCloseHandle(hFile);
-    InternetCloseHandle(hFtpSession);
-    InternetCloseHandle(hInternet);
-
-    std::cout << "File read successfully: " << fileContent;
-    return 0;
-}
-
 time_t AdjustEpochToUTC(time_t localEpoch) {
     TIME_ZONE_INFORMATION tzInfo;
     DWORD result = GetTimeZoneInformation(&tzInfo);
@@ -230,120 +177,9 @@ time_t AdjustEpochToUTC(time_t localEpoch) {
     return utcEpoch;
 }
 
-void ToTray() {
-  HINSTANCE hInstance       = GetModuleHandle(NULL);
-  NOTIFYICONDATA icondata   = {0};
-  icondata.cbSize           = sizeof(NOTIFYICONDATA);
-  icondata.hWnd             = GetConsoleWindow();
-  icondata.uID              = 1;
-  icondata.uFlags           = NIF_MESSAGE | NIF_ICON | NIF_TIP;
-  icondata.uCallbackMessage = WM_USER + 1;
-  icondata.hIcon            = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON));
-  strcpy(icondata.szTip, "Wii U Rich Presence");
-
-  ShowWindow(GetConsoleWindow(), SW_HIDE);
-  Shell_NotifyIcon(NIM_ADD, &icondata);
-}
-
-int CreateStartupShortcut() {
-  HRESULT hr;
-  WCHAR startupPath[MAX_PATH];
-  PWSTR pszPath = NULL;
-
-  // Get the Startup folder path and app path
-  hr = SHGetKnownFolderPath(FOLDERID_Startup, 0, NULL, &pszPath);
-  if (FAILED(hr)) return 1;
-
-  WCHAR exePath[MAX_PATH];
-  GetModuleFileNameW(NULL, exePath, MAX_PATH);
-
-  wsprintfW(startupPath, L"%s\\WURP.lnk", pszPath);
-  CoTaskMemFree(pszPath);
-
-  if (PathFileExistsW(startupPath)) {
-    // Shortcut already exists
-    return 0;
-  }
-
-  // Initialize COM and create the shortcut
-  CoInitialize(NULL);
-  IShellLinkW* pShellLink;
-  hr = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER,
-                                IID_IShellLinkW, (void**)&pShellLink);
-
-  if (SUCCEEDED(hr)) {
-    pShellLink->SetPath(exePath);
-    pShellLink->SetDescription(L"Wii U Rich Presence startup");
-
-    IPersistFile* pPersistFile;
-    hr = pShellLink->QueryInterface(IID_IPersistFile, (void**)&pPersistFile);
-    if (SUCCEEDED(hr)) {
-      pPersistFile->Save(startupPath, TRUE);
-      pPersistFile->Release();
-    }
-    pShellLink->Release();
-  }
-
-  CoUninitialize();
-}
-
-int main(int argc, char* argv[]) {
+int main() {
   json fjs;
   std::ifstream fif("save.json");
-
-  // Command line inputs
-  if (argc > 1) {
-    if (!fif.good()) {
-      std::cerr << "save.json does not exist." << std::endl;
-      return 0;
-    }
-
-    try {
-      fjs = json::parse(fif);
-    } catch (const std::exception& e) {
-      std::cerr << "Failed to parse save.json: " << e.what() << std::endl;
-      return 0;
-    }
-
-    int skipsave = true;
-    for (int i = 2; i <= argc; i+= 2) {
-      int c = i - 1;
-      try {
-        if (strcmp(argv[c], "server") == 0) {
-          fjs["server"] = (argv[i]); skipsave = false;
-          std::cout << "Set server to " << argv[i] << std::endl;
-        }
-        else if (strcmp(argv[c], "time") == 0) {
-          fjs["time"] = std::stoi(argv[i]); skipsave = false;
-          std::cout << "Set time to " << argv[i] << std::endl;
-        }
-        else if (strcmp(argv[c], "logging") == 0 || strcmp(argv[c], "tray") == 0 || strcmp(argv[c], "startup") == 0) {
-          fjs[argv[c]] = static_cast<bool>(argv[i]); skipsave = false;
-          std::cout << "Set " << argv[c] << " to " << argv[i] << std::endl;
-        }
-        else {
-          std::cerr << "Invalid setting \"" << argv[c] << "\"" << std::endl;
-        }
-      }
-      catch (const std::exception& e) {
-        std::cerr << "Failed to save setting \"" << argv[c] << "\" : " << e.what() << std::endl;
-      }
-    }
-
-    if (!skipsave) {
-      save(fjs);
-      std::cout << "Settings saved successfully. Run the app?\n(y/n): ";
-      std::string answer;
-      std::cin >> answer;
-      if (answer == "n") {return 0;}
-    }
-    else {
-      std::cout << "Unable to save settings: errors occured!" << std::endl;
-      return 1;
-    }
-    std::cout << std::endl;
-  }
-
   bool auth =      true;
   bool logging =   false;
 
@@ -356,22 +192,14 @@ int main(int argc, char* argv[]) {
         logging = fjs["logging"];
     } catch (const std::exception& e) {
         std::cerr << "Failed to parse save.json: " << e.what() << "\n" << std::endl;
-        fjs = json::parse(R"({"server":"","time":0,"auth":true,"logging":false,"tray":false,"startup":false,"cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
+        fjs = json::parse(R"({"auth":true,"logging":false,"cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
         save(fjs);
         auth = true;
         logging = false;
     }
   } else {
-    fjs = json::parse(R"({"server":"","time":0,"auth":true,"logging":false,"tray":false,"startup":false,"cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
+    fjs = json::parse(R"({"auth":true,"logging":false,"cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
     save(fjs);
-  }
-
-  if (fjs["tray"]) {
-    ToTray();
-  }
-
-  if (fjs["startup"]) {
-    CreateStartupShortcut();
   }
 
   std::signal(SIGINT, signalHandler);
@@ -404,12 +232,12 @@ int main(int argc, char* argv[]) {
       auth = !Authorize(client, fjs);
     } else {
       std::this_thread::sleep_for(std::chrono::seconds(5));
-      std::string accessToken                     = fjs["cache"]["accessToken"];
-      std::string refreshToken                    = fjs["cache"]["refreshToken"];
+      std::string accessToken =                     fjs["cache"]["accessToken"];
+      std::string refreshToken =                    fjs["cache"]["refreshToken"];
       discordpp::AuthorizationTokenType tokenType = discordpp::AuthorizationTokenType::Bearer;
-      int32_t expiresIn                           = fjs["cache"]["expiresIn"];
-      std::string scope                           = fjs["cache"]["scope"];
-      int step                                    = 0;
+      int32_t expiresIn =                           fjs["cache"]["expiresIn"];
+      std::string scope =                           fjs["cache"]["scope"];
+      int step =                                    0;
 
       if (SyncUpdateToken(client, tokenType, accessToken)) {
         client->Connect();
@@ -453,105 +281,80 @@ int main(int argc, char* argv[]) {
     save(fjs);
   } while (auth);
 
-  // IPv4 address
-  std::string ip;
-  if (fjs["server"] != "") {
-    std::cout << "Loaded FTP server address\n";
-    ip = fjs["server"];
-  } else {
-    std::cout << "\nThanks for using Wii U Rich Presence.\nThis plugin is dependent on the ftpiiu plugin. Confirm that it is enabled.\n\nPlease input your Wii U's IP address.\nThis can be found in ftpiiu's plugin configuration settings.\nDo not include the port number.\nType here: ";
-    std::cin >> ip;
-    fjs["server"] = ip;
-    std::cout << "The FTP address has been saved.\n";
-
-    std::string answer;
-
-    std::cout << "\nWould you like to have this app start when your computer starts up?\n(y/n): ";
-    std::cin >> answer;
-    if (answer == "n") {fjs["startup"] = false;}
-    else {fjs["startup"] = true; CreateStartupShortcut(); std::cout << "App startup has been enabled." << std::endl;}
-
-    std::cout << "\nWould you like to have the app minimize to system tray when ran?\n(y/n): ";
-    std::cin >> answer;
-    if (answer == "n") {fjs["tray"] = false;}
-    else {fjs["tray"] = true; std::cout << "Minimizing to tray has been enabled. It will minimize on next use.\n" << std::endl;}
-
-    std::cout << std::endl;
-    save(fjs);
-  }
-  
-  if (fjs["time"] == 0) {
-    std::cout << "If the elapsed time does not display correctly, edit the \"time\" key in save.json to shift the hour (-12 to 12).\n\n";
-  }
-
-  std::wstring server     = std::wstring(ip.begin(), ip.end());
-  std::wstring remoteFile = L"/fs/vol/external01/rich_presence.txt";
-  std::string local       = "";
-  std::string read        = "";
+  json out;
+  char buffer[1024];
+  const int PORT          = 5005;
   std::string players[8]  = {"Singleplayer","Local 2-Player","Local 3-Player","Local 4-Player","Local 5-Player","Local 6-Player","Local 7-Player","Local 8-Player"};
-  std::string out[3]      = {"","",""};
-  int i                   = 0;
-  int b                   = 0;
-  int time                = fjs["time"];
-  bool connected          = false;
-  // out[0] is the game name. out[1] is the time. out[2] is the number of controllers.
 
   // Keep application running to allow SDK to receive events and callbacks
+  WSADATA wsaData;
+  if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+    std::cerr << "WSAStartup failed.\n";
+    return 1;
+  }
+
+  // Create UDP socket
+  SOCKET sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (sock == INVALID_SOCKET) {
+    std::cerr << "Socket creation failed.\n";
+    WSACleanup();
+    return 1;
+  }
+
+  // Bind to all interfaces on the specified port
+  sockaddr_in addr {};
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(PORT);
+  addr.sin_addr.s_addr = INADDR_ANY;
+
+  if (bind(sock, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
+    std::cerr << "Bind failed.\n";
+    closesocket(sock);
+    WSACleanup();
+    return 1;
+  }
+
+  std::cout << "Listening for Wii U broadcasts on port " << PORT << "...\n";
+
   while (true) {
     discordpp::RunCallbacks();
-    if (b % 500 == 0) {
-      b = 0;
-      if (connected) {
-        if (ReadFileFromFTP(server, remoteFile, local) == 1) {
-          connected = false;
-        } else {
-          read = "";
-          i = 0;
-          for(char c: local) {
-            if (i == 2) {
-              out[2] = c;
-              break;
-            }
-            if (c=='^') {
-              out[i] = read;
-              i++;
-              read = "";
-            } else {read += c;}
-          }
+    sockaddr_in sender {};
+    int senderLen = sizeof(sender);
+    int len = recvfrom(sock, buffer, sizeof(buffer) - 1, 0,
+                        (sockaddr*)&sender, &senderLen);
+    if (len == SOCKET_ERROR) {
+        std::cerr << "recvfrom failed.\n";
+        break;
+    }
 
-          // Configure rich presence details
-          discordpp::Activity activity;
-          activity.SetType(discordpp::ActivityTypes::Playing);
-          activity.SetDetails(out[0]);
-          activity.SetState(players[std::stoi(out[2])]);
-          discordpp::ActivityAssets assets;
-          assets.SetLargeImage("preview");
-          activity.SetAssets(assets);
-          discordpp::ActivityTimestamps timestamps;
-          timestamps.SetStart(AdjustEpochToUTC(std::stoi(out[1])+time*3600));
-          activity.SetTimestamps(timestamps);
+    buffer[len] = '\0'; // Null-terminate
+    std::string message = buffer;
+    std::cout << "Received: " << buffer << std::endl;
+    out = json::parse(message);
 
-          // Update rich presence
-          client->UpdateRichPresence(activity, [out, local](discordpp::ClientResult result) {
+    // Configure rich presence details
+    discordpp::Activity activity;
+    activity.SetType(discordpp::ActivityTypes::Playing);
+    activity.SetDetails(out["app"]);
+    activity.SetState(players[out["ctrls"]]);
+    discordpp::ActivityAssets assets;
+    assets.SetLargeImage("preview");
+    activity.SetAssets(assets);
+    discordpp::ActivityTimestamps timestamps;
+    timestamps.SetStart(AdjustEpochToUTC(out["time"]));
+    activity.SetTimestamps(timestamps);
+    
+    // Update rich presence
+    client->UpdateRichPresence(activity, [](discordpp::ClientResult result) {
             if(result.Successful()) {
-              std::cout << "Rich Presence updated successfully!\n" << out[0] << ", " << out[1] << ", " << out[2] << "\n";
+              std::cout << "Rich Presence updated successfully!\n";
             } else {
               std::cout << "Rich Presence update failed\n";
             }
           });
-        }
-      } else {
-        if (ReadFileFromFTP(server, remoteFile, local) == 0) {
-          connected = true;
-        } else {
-          // Clear rich presence when disconnected
-          client->ClearRichPresence();
-        }
-      }
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    b++;
   }
-  std::cerr << "Error: Skipped loop!";
+
+  closesocket(sock);
+  WSACleanup();
   return 0;
 }
