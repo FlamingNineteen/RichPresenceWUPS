@@ -33,8 +33,16 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* use
   return totalSize;
 }
 
-void save(json fjs) {
-  std::ofstream ofs("save.json");
+std::string GetAppDir() {
+    char buffer[MAX_PATH];
+    GetModuleFileNameA(NULL, buffer, MAX_PATH);
+    std::string fullPath(buffer);
+    std::string directory = fullPath.substr(0, fullPath.find_last_of("\\/"));
+    return directory;
+}
+
+void save(json fjs, std::string dir) {
+  std::ofstream ofs(dir + "/save.json");
   ofs << fjs.dump(4);
   ofs.close();
 }
@@ -179,9 +187,10 @@ time_t AdjustEpochToUTC(time_t localEpoch) {
 
 int main() {
   json fjs;
-  std::ifstream fif("save.json");
-  bool auth =      true;
-  bool logging =   false;
+  std::string dir = GetAppDir();
+  std::ifstream fif(dir + "/save.json");
+  bool auth       = true;
+  bool logging    = false;
 
   // Get JSON Info
   std::cout << "Retrieving data...\n";
@@ -193,13 +202,13 @@ int main() {
     } catch (const std::exception& e) {
         std::cerr << "Failed to parse save.json: " << e.what() << "\n" << std::endl;
         fjs = json::parse(R"({"auth":true,"logging":false,"cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
-        save(fjs);
+        save(fjs, dir);
         auth = true;
         logging = false;
     }
   } else {
     fjs = json::parse(R"({"auth":true,"logging":false,"cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
-    save(fjs);
+    save(fjs, dir);
   }
 
   std::signal(SIGINT, signalHandler);
@@ -278,7 +287,7 @@ int main() {
     }
 
     fjs["auth"] = auth;
-    save(fjs);
+    save(fjs, dir);
   } while (auth);
 
   json out;
