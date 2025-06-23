@@ -1,3 +1,4 @@
+#define APP_ID 1353248127469228074
 #define DISCORDPP_IMPLEMENTATION
 #define _CRT_SECURE_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
@@ -16,10 +17,14 @@
 using json = nlohmann::json;
 
 // Replace with your Discord Application ID
-const uint64_t APPLICATION_ID = 1353248127469228074;
+const uint64_t APPLICATION_ID = APP_ID;
 
 // Create a flag to stop the application
 std::atomic<bool> running = true;
+
+// Clears rich presenc if idle
+std::atomic<bool> idle = false;
+std::atomic<bool> runIdleLoop = false;
 
 // Signal handler to stop the application
 void signalHandler(int signum) {
@@ -113,6 +118,17 @@ RefreshResult SyncRefreshToken(std::shared_ptr<discordpp::Client> client, const 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     return future.get();
+}
+
+void CheckIdle(std::shared_ptr<discordpp::Client> client) {
+  bool allow = true;
+  while (runIdleLoop) {
+    std::this_thread::sleep_for(std::chrono::seconds(8));
+    if (idle) {if (allow) {client->ClearRichPresence();}}
+    else {allow = true;};
+    idle = true;
+  }
+  return;
 }
 
 bool Authorize(std::shared_ptr<discordpp::Client> client, json &fjs) {
@@ -323,6 +339,9 @@ int main() {
     return 1;
   }
 
+  runIdleLoop = true;
+  std::thread tthread(CheckIdle, client);
+
   std::cout << "Listening for Wii U broadcasts on port " << PORT << "...\n";
 
   while (true) {
@@ -340,6 +359,8 @@ int main() {
     std::string message = buffer;
     std::cout << "Received: " << buffer << std::endl;
     out = json::parse(message);
+
+    idle = false;
 
     // Configure rich presence details
     discordpp::Activity activity;
@@ -365,5 +386,8 @@ int main() {
 
   closesocket(sock);
   WSACleanup();
+  if (tthread.joinable()) {
+    tthread.join();
+  }
   return 0;
 }
