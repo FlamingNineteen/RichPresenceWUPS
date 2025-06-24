@@ -3,10 +3,13 @@
 #define _CRT_SECURE_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "winhttp.lib")
 #include <iostream>
 #include <thread>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <winhttp.h>
+#include <vector>
 #include <atomic>
 #include <string>
 #include <csignal>
@@ -22,7 +25,7 @@ const uint64_t APPLICATION_ID = APP_ID;
 // Create a flag to stop the application
 std::atomic<bool> running = true;
 
-// Clears rich presenc if idle
+// Clears rich presence if idle
 std::atomic<bool> idle = false;
 std::atomic<bool> runIdleLoop = false;
 
@@ -55,6 +58,12 @@ void save(json fjs, std::string dir) {
 void debug(int d, int s = 0) {
   std::cout << "\nStep " << std::to_string(d);
   std::this_thread::sleep_for(std::chrono::seconds(s));
+}
+
+std::wstring to_wstring(const std::string s)
+{
+    std::wstring ws(s.begin(), s.end());
+    return ws;
 }
 
 bool WaitForDiscordReady(std::shared_ptr<discordpp::Client> client, int timeoutSeconds = 10) {
@@ -201,12 +210,51 @@ time_t AdjustEpochToUTC(time_t localEpoch) {
     return utcEpoch;
 }
 
+std::string FetchRawHtml(std::wstring server, std::wstring path) {
+  HINTERNET hSession = WinHttpOpen(L"MyApp", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, NULL, NULL, 0);
+  if (!hSession) return "";
+  
+  HINTERNET hConnect = WinHttpConnect(hSession, server.c_str(), INTERNET_DEFAULT_HTTPS_PORT, 0);
+  if (!hConnect) return "";
+  
+  HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", path.c_str(),
+                                          NULL, WINHTTP_NO_REFERER,
+                                          WINHTTP_DEFAULT_ACCEPT_TYPES,
+                                          WINHTTP_FLAG_SECURE);
+  
+  std::string content;
+  if (WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+                          WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+      WinHttpReceiveResponse(hRequest, NULL)) {
+      
+      DWORD dwSize = 0;
+      do {
+          DWORD dwDownloaded = 0;
+          if (!WinHttpQueryDataAvailable(hRequest, &dwSize)) break;
+
+          if (dwSize > 0) {
+              std::vector<char> buffer(dwSize);
+              if (WinHttpReadData(hRequest, buffer.data(), dwSize, &dwDownloaded)) {
+                  content.append(buffer.data(), dwDownloaded);
+              }
+          }
+      } while (dwSize > 0);
+  }
+  
+  WinHttpCloseHandle(hRequest);
+  WinHttpCloseHandle(hConnect);
+  WinHttpCloseHandle(hSession);
+
+  return content;
+}
+
 int main() {
   json fjs;
-  std::string dir = GetAppDir();
+  std::string dir  = GetAppDir();
   std::ifstream fif(dir + "/save.json");
-  bool auth       = true;
-  bool logging    = false;
+  bool auth        = true;
+  bool logging     = false;
+  std::string repo = "flamingnineteen/RichPresenceWUPS-DB";
 
   // Get JSON Info
   std::cout << "Retrieving data...\n";
@@ -215,15 +263,18 @@ int main() {
         fjs = json::parse(fif);
         auth = fjs["auth"];
         logging = fjs["logging"];
+        if (fjs["repo"] != "") repo = fjs["repo"];
+        std::cout << "Using repository " << repo << std::endl;
+
     } catch (const std::exception& e) {
         std::cerr << "Failed to parse save.json: " << e.what() << "\n" << std::endl;
-        fjs = json::parse(R"({"auth":true,"logging":false,"cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
+        fjs = json::parse(R"({"auth":true,"logging":false,"repo":"","cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
         save(fjs, dir);
         auth = true;
         logging = false;
     }
   } else {
-    fjs = json::parse(R"({"auth":true,"logging":false,"cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
+    fjs = json::parse(R"({"auth":true,"logging":false,"repo":"","cache":{"accessToken":"","refreshToken":"","expiresIn":0,"scope":""}})");
     save(fjs, dir);
   }
 
@@ -307,9 +358,19 @@ int main() {
   } while (auth);
 
   json out;
+  json images;
   char buffer[1024];
   const int PORT          = 5005;
   std::string players[8]  = {"Singleplayer","Local 2-Player","Local 3-Player","Local 4-Player","Local 5-Player","Local 6-Player","Local 7-Player","Local 8-Player"};
+
+  std::cout << "Fetching titles.json..." << std::endl;
+  std::string fetch = FetchRawHtml(L"raw.githubusercontent.com", L"/" + to_wstring(repo) + L"/refs/heads/main/titles.json");
+  try {
+    images = json::parse(fetch);
+    std::cout << "Successfully fetched titles.json!" << std::endl;
+  } catch (...) {
+    std::cout << "Error fetching titles.json. Using default image." << std::endl;
+  }
 
   // Keep application running to allow SDK to receive events and callbacks
   WSADATA wsaData;
@@ -357,31 +418,38 @@ int main() {
 
     buffer[len] = '\0'; // Null-terminate
     std::string message = buffer;
-    std::cout << "Received: " << buffer << std::endl;
-    out = json::parse(message);
+    try {
+      out = json::parse(message);
+      if (out["sender"] == "Wii U") {
+        std::cout << "Received: " << buffer << std::endl;
 
-    idle = false;
+        idle = false;
 
-    // Configure rich presence details
-    discordpp::Activity activity;
-    activity.SetType(discordpp::ActivityTypes::Playing);
-    activity.SetDetails(out["app"]);
-    activity.SetState(players[out["ctrls"]]);
-    discordpp::ActivityAssets assets;
-    assets.SetLargeImage("preview");
-    activity.SetAssets(assets);
-    discordpp::ActivityTimestamps timestamps;
-    timestamps.SetStart(AdjustEpochToUTC(out["time"]));
-    activity.SetTimestamps(timestamps);
-    
-    // Update rich presence
-    client->UpdateRichPresence(activity, [](discordpp::ClientResult result) {
-            if(result.Successful()) {
-              std::cout << "Rich Presence updated successfully!\n";
-            } else {
-              std::cout << "Rich Presence update failed\n";
-            }
-          });
+        // Configure rich presence details
+        discordpp::Activity activity;
+        activity.SetType(discordpp::ActivityTypes::Playing);
+        activity.SetDetails(out["app"]);
+        activity.SetState(players[out["ctrls"]]);
+        discordpp::ActivityAssets assets;
+        try {
+          std::string temp = images[out["long"]];
+          assets.SetLargeImage("https://raw.githubusercontent.com/" + repo + "/refs/heads/main/icons/" + temp);
+        } catch (...) {
+          assets.SetLargeImage("preview");
+        }
+        activity.SetAssets(assets);
+        discordpp::ActivityTimestamps timestamps;
+        timestamps.SetStart(AdjustEpochToUTC(out["time"]));
+        activity.SetTimestamps(timestamps);
+        
+        // Update rich presence
+        client->UpdateRichPresence(activity, [](discordpp::ClientResult result) {
+          if (result.Successful()) std::cout << "Rich Presence updated successfully!\n";
+          else std::cout << "Rich Presence update failed\n";
+        });
+      }
+    }
+    catch (...) {std::cout << "Json parse error" << std::endl;}
   }
 
   closesocket(sock);
