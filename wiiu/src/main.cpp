@@ -30,11 +30,6 @@
 #include <nn/acp/client.h>
 #include <nn/acp/title.h>
 
-// #include <nn/acp/client.h>
-// #include <nn/acp/title.h>
-
-#define STACK_SIZE 0x2000
-
 /**
     Mandatory plugin information.
     If not set correctly, the loader will refuse to use the plugin.
@@ -45,19 +40,25 @@ WUPS_PLUGIN_VERSION("v1.0");
 WUPS_PLUGIN_AUTHOR("Flaming19");
 WUPS_PLUGIN_LICENSE("GNU");
 
+#define STACK_SIZE 0x2000
+#define CONFIG_ENABLED_CONFIG_ID "enabled"
+#define CONFIG_TIMESET_CONFIG_ID "timeset"
+
+/**
+    All of these defines can be used in ANY file.
+    It's possible to split it up into multiple files.
+**/
+
 WUPS_USE_WUT_DEVOPTAB();           // Use the wut devoptabs
 WUPS_USE_STORAGE("rich_presence"); // Unique id for the storage api
 
-// Settings
-struct WURPConfig {
-    int timeSet;
-    bool enabled;
-};
+#define CONFIG_ENABLED_DEFAULT_VALUE true
+#define CONFIG_TIMESET_DEFAULT_VALUE 0
 
-// Global variables
 std::jthread tthread;
 int elapsed;
-WURPConfig settings;
+bool configEnabled   = CONFIG_ENABLED_DEFAULT_VALUE;
+int configTimeset    = CONFIG_TIMESET_DEFAULT_VALUE;
 std::string app      = "";
 std::string preapp   = "quantum random!!!11!";
 WPADChan channels[7] = {WPAD_CHAN_0, WPAD_CHAN_1, WPAD_CHAN_2, WPAD_CHAN_3, WPAD_CHAN_4, WPAD_CHAN_5, WPAD_CHAN_6};
@@ -72,12 +73,14 @@ int ctrlNum() {
     return c;
 }
 
-std::string GetNameOfCurrentApplication() {
+std::string GetXmlTag(std::string tag) {
     std::string result;
     ACPInitialize();
     auto *metaXml = (ACPMetaXml *) memalign(0x40, sizeof(ACPMetaXml));
     if (ACPGetTitleMetaXml(OSGetTitleID(), metaXml) == ACP_RESULT_SUCCESS) {
-        result = metaXml->shortname_en;
+        if (tag == "longname_en") result       = metaXml->longname_en;
+        else if (tag == "shortname_en") result = metaXml->shortname_en;
+        else result.clear();
     } else {
         result.clear();
     }
@@ -106,7 +109,7 @@ void GameLoop(std::stop_token stoken) {
     while (!stoken.stop_requested()) {
         if (app != "") {
             int ctrls = ctrlNum();
-            std::string json = "{\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed) + ",\"ctrls\":" + std::to_string(ctrls) + "}";
+            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + GetXmlTag("longname_en") + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed) + ",\"ctrls\":" + std::to_string(ctrls) + "}";
             Broadcast(json);
         }
 
@@ -118,59 +121,82 @@ void GameLoop(std::stop_token stoken) {
     return;
 }
 
-// Callbacks that will be called if the config has been changed
+/**
+ * Callback that will be called if the config has been changed
+ */
 void boolItemChanged(ConfigItemBoolean *item, bool newValue) {
-    if (std::string_view("enabled") == item->identifier) {
-        settings.enabled = newValue;
+    if (std::string_view(CONFIG_ENABLED_CONFIG_ID) == item->identifier) {
+        configEnabled = newValue;
         // If the value has changed, we store it in the storage.
         WUPSStorageAPI::Store(item->identifier, newValue);
     }
 }
 
 void integerRangeItemChanged(ConfigItemIntegerRange *item, int newValue) {
-    if (std::string_view("timeSet") == item->identifier) {
-        settings.timeSet = newValue;
+    if (std::string_view(CONFIG_TIMESET_CONFIG_ID) == item->identifier) {
+        configTimeset = newValue;
         // If the value has changed, we store it in the storage.
         WUPSStorageAPI::Store(item->identifier, newValue);
     }
 }
 
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
+    // Create a new WUPSConfigCategory from the root handle
     WUPSConfigCategory root = WUPSConfigCategory(rootHandle);
 
     try {
-        auto infoCat = WUPSConfigCategory::Create("Setup Information");
-        infoCat.add(WUPSConfigItemStub::Create("This plugin works with a pc application."));
-        infoCat.add(WUPSConfigItemStub::Create("That application must be running to update rich presence."));
-        infoCat.add(WUPSConfigItemStub::Create("Check this plugin's repository for more information."));
-        root.add(std::move(infoCat));
-
-        root.add(WUPSConfigItemBoolean::Create("enabled", "Enabled",
-                                               settings.enabled, true,
-                                               boolItemChanged));
+        // Setup information category
+        auto setupCat = WUPSConfigCategory::Create("Setup information");
+        setupCat.add(WUPSConfigItemStub::Create("This plugin works with a computer application."));
+        setupCat.add(WUPSConfigItemStub::Create("That application must be running to update rich presence."));
+        setupCat.add(WUPSConfigItemStub::Create("Check this plugin's repository for more information:"));
+        setupCat.add(WUPSConfigItemStub::Create("https://github.com/flamingnineteen/RichPresenceWUPS"));
+        root.add(std::move(setupCat));
         
-        root.add(WUPSConfigItemIntegerRange::Create("timeSet", "Item for selecting an integer between 0 and 50",
-                                                    0, settings.timeSet,
+        // Settings category
+        auto configCat = WUPSConfigCategory::Create("Plugin settings");
+
+        // Enabled boolean
+        configCat.add(WUPSConfigItemBoolean::Create(CONFIG_ENABLED_CONFIG_ID, "Enabled",
+                                               CONFIG_ENABLED_DEFAULT_VALUE, configEnabled,
+                                               boolItemChanged));
+
+        // Timeset integer range
+        configCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_TIMESET_CONFIG_ID, "Offset \"elapsed time\" timezone for correct display",
+                                                    CONFIG_TIMESET_DEFAULT_VALUE, configTimeset,
                                                     -12, 12,
                                                     &integerRangeItemChanged));
+        
+        root.add(std::move(configCat));
+
+        // Contribute category
+        auto helpCat = WUPSConfigCategory::Create("Contribute");
+        helpCat.add(WUPSConfigItemStub::Create("The plugin is missing images of many Wii U games."));
+        helpCat.add(WUPSConfigItemStub::Create("If you are interested in adding game images, and"));
+        helpCat.add(WUPSConfigItemStub::Create("have a Github account, check out this repository:"));
+        helpCat.add(WUPSConfigItemStub::Create("https://github.com/flamingnineteen/RichPresenceWUPS-DB"));
+        root.add(std::move(helpCat));
 
         return WUPSCONFIG_API_CALLBACK_RESULT_SUCCESS;
-    } catch (std::exception &e) {
-        return WUPSCONFIG_API_CALLBACK_RESULT_ERROR;
-    }
+    } catch (std::exception &e) {return WUPSCONFIG_API_CALLBACK_RESULT_ERROR;}
+}
+
+void ConfigMenuClosedCallback() {
+    WUPSStorageAPI::SaveStorage();
 }
 
 INITIALIZE_PLUGIN() {
-    settings.timeSet    = 0;
-    settings.enabled = true;
-    WUPSStorageAPI::Get("time", settings.timeSet);
-    WUPSStorageAPI::Get("enabled", settings.enabled);
+    WUPSConfigAPIOptionsV1 configOptions = {.name = "Rich Presence"};
+    WUPSConfigAPI_Init(configOptions, ConfigMenuOpenedCallback, ConfigMenuClosedCallback);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_ENABLED_CONFIG_ID, configEnabled, CONFIG_ENABLED_DEFAULT_VALUE);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_TIMESET_CONFIG_ID, configTimeset, CONFIG_TIMESET_DEFAULT_VALUE);
+    WUPSStorageAPI::SaveStorage();
 }
 
 ON_APPLICATION_START() {
-    app = GetNameOfCurrentApplication();
-    if (GetNameOfCurrentApplication() == "Health and Safety Information") {app = "Homebrew Application";}
-    if (app != preapp) {elapsed = time(NULL);}
+    app = GetXmlTag("shortname_en");
+    if (app == "Health and Safety Information") app = "Homebrew Application";
+    if (app != preapp) elapsed = time(NULL) + (configTimeset * 3600); // Only update elapsed time if app changed
     preapp = app;
     if (tthread.joinable()) {
         tthread.request_stop();

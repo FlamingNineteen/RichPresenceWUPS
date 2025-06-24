@@ -15,7 +15,7 @@ Start your Wii U with the environment you placed the plugin in.
 
 Run `WiiURichPresence` in the `wurpDiscord` folder with the Discord app open or Discord open on your browser. Authorize the app in Discord.
 
-Elapsed time may not show up correctly because of your Wii U's time. **TODO** <!-- To offset the elapsed time that shows up in Discord by a certain amount of hours, open the plugin configuration menu and change the -->
+Elapsed time may not show up correctly because of your Wii U's time. To offset the elapsed time that shows up in Discord by a certain amount of hours, open the plugin configuration menu and change the setting. If elapsed time displays `0:00:00`, you need to change the setting to a negative number. If elapsed time displays hours ahead of your actual play time, you need to change the setting to a positive number.
 
 ## Building
 For specifics on building either the plugin or the executable, please check the respective directories.
