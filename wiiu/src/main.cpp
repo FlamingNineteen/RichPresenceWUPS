@@ -88,6 +88,15 @@ std::string GetXmlTag(std::string tag) {
     return result;
 }
 
+std::string RemoveSlashN(std::string s) {
+    while (true) {
+        size_t finder = s.find("\n");
+        if (finder == std::string::npos) break;
+        s.replace(finder, 1, " ");
+    }
+    return s;
+}
+
 // Broadcast over port 5005
 void Broadcast(const std::string& json) {
     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -109,7 +118,7 @@ void GameLoop(std::stop_token stoken) {
     while (!stoken.stop_requested()) {
         if (app != "") {
             int ctrls = ctrlNum();
-            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + GetXmlTag("longname_en") + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed) + ",\"ctrls\":" + std::to_string(ctrls) + "}";
+            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + RemoveSlashN(GetXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + "}";
             Broadcast(json);
         }
 
@@ -196,7 +205,7 @@ INITIALIZE_PLUGIN() {
 ON_APPLICATION_START() {
     app = GetXmlTag("shortname_en");
     if (app == "Health and Safety Information") app = "Homebrew Application";
-    if (app != preapp) elapsed = time(NULL) + (configTimeset * 3600); // Only update elapsed time if app changed
+    if (app != preapp) elapsed = time(NULL); // Only update elapsed time if app changed
     preapp = app;
     if (tthread.joinable()) {
         tthread.request_stop();
