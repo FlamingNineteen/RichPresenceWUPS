@@ -6,7 +6,9 @@ build/
 resources/
 archive/
 *.bat
+*.sh
 *.elf
 *.lst
 *.wps
 *.zip
+*.tar.xz
