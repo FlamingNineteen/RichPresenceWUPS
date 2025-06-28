@@ -1,4 +1,5 @@
 #define APP_ID 1353248127469228074
+#define UDP_PORT 5005
 #define DISCORDPP_IMPLEMENTATION
 #include <iostream>
 #include <thread>
@@ -6,9 +7,29 @@
 #include <atomic>
 #include <string>
 #include <csignal>
+#include <cstdlib>
 #include <limits>
 #include <fstream>
 #include <future>
+#include <ctime>
+
+#if defined(__linux__) || defined(__APPLE__)
+	#include <boost/asio.hpp>
+	#include <boost/beast/core.hpp>
+	#include <boost/beast/http.hpp>
+	#include <boost/beast/ssl.hpp>
+	#include <boost/asio/connect.hpp>
+	#include <boost/asio/ip/tcp.hpp>
+	#include <boost/asio/ssl/error.hpp>
+	#include <boost/asio/ssl/stream.hpp>
+	namespace beast = boost::beast;
+	namespace http = beast::http;
+	namespace net = boost::asio;
+	namespace ssl = net::ssl;
+	using tcp = net::ip::tcp;
+	using boost::asio::ip::udp;
+#endif
+
 #include "discordpp.h"
 #include "json.hpp"
 using json = nlohmann::json;
@@ -90,8 +111,7 @@ void debug(int d, int s = 0) {
 	std::this_thread::sleep_for(std::chrono::seconds(s));
 }
 
-std::wstring to_wstring(const std::string s)
-{
+std::wstring to_wstring(const std::string s) {
 	std::wstring ws(s.begin(), s.end());
 	return ws;
 }
@@ -234,25 +254,29 @@ time_t AdjustEpochToUTC(time_t localEpoch) {
 		DWORD result = GetTimeZoneInformation(&tzInfo);
 
 		// Use only the standard time bias, ignoring daylight saving time
-		int bias = tzInfo.Bias; // Standard time bias
+		int bias = tzInfo.Bias;
 
 		// Convert bias from minutes to seconds and adjust the Epoch time
 		time_t utcEpoch = localEpoch + (bias * 60);
 		return utcEpoch;
-	#elif __linux__
-	#elif __APPLE__
+	#elif defined(__linux__) || defined(__APPLE__)
+		long timezone_offset = timezone;
+    	return local_epoch + timezone_offset;
 	#endif
 }
 
-std::string FetchRawHtml(std::wstring server, std::wstring path) {
+std::string FetchRawHtml(std::string server, std::string path) {
 	#ifdef _WIN32
-		HINTERNET hSession = WinHttpOpen(L"MyApp", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, NULL, NULL, 0);
+		std::wstring wserver = to_wstring(server);
+		std::wstring wpath = to_wstring(path);
+
+		HINTERNET hSession = WinHttpOpen(L"WURP", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, NULL, NULL, 0);
 		if (!hSession) return "";
 		
-		HINTERNET hConnect = WinHttpConnect(hSession, server.c_str(), INTERNET_DEFAULT_HTTPS_PORT, 0);
+		HINTERNET hConnect = WinHttpConnect(hSession, wserver.c_str(), INTERNET_DEFAULT_HTTPS_PORT, 0);
 		if (!hConnect) return "";
 		
-		HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", path.c_str(),
+		HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", wpath.c_str(),
 												NULL, WINHTTP_NO_REFERER,
 												WINHTTP_DEFAULT_ACCEPT_TYPES,
 												WINHTTP_FLAG_SECURE);
@@ -281,9 +305,50 @@ std::string FetchRawHtml(std::wstring server, std::wstring path) {
 		WinHttpCloseHandle(hSession);
 
 		return content;
-	#elif __linux__
-	#elif __APPLE__
+	#elif defined(__linux__) || defined(__APPLE__)
+		try {
+			std::string port = "443";
+			int version = 11;
+
+			net::io_context ioc;
+			ssl::context ctx(ssl::context::tlsv12_client);
+			ctx.set_default_verify_paths();
+
+			beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
+
+			if (!SSL_set_tlsext_host_name(stream.native_handle(), server.c_str()))
+				throw beast::system_error(
+					beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category()));
+
+			tcp::resolver resolver(ioc);
+			auto const results = resolver.resolve(server, port);
+			beast::get_lowest_layer(stream).connect(results);
+			stream.handshake(ssl::stream_base::client);
+
+			http::request<http::string_body> req{http::verb::get, target, version};
+			req.set(http::field::host, server);
+			req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+			http::write(stream, req);
+
+			beast::flat_buffer buffer;
+			http::response<http::dynamic_body> res;
+			http::read(stream, buffer, res);
+
+			beast::error_code ec;
+			stream.shutdown(ec);
+			if (ec == net::error::eof) ec = {};
+			if (ec) throw beast::system_error{ec};
+
+			// Convert response body to a string and return it
+			std::ostringstream os;
+			os << beast::buffers_to_string(res.body().data());
+			return os.str();
+		} catch (...) {
+			return std::string("An error occured");
+		}
 	#endif
+	return "";
 }
 
 int main() {
@@ -396,11 +461,11 @@ int main() {
 	json out;
 	json images;
 	char buffer[1024];
-	const int PORT         = 5005;
+	const int PORT         = UDP_PORT;
 	std::string players[8] = {"Singleplayer","Local 2-Player","Local 3-Player","Local 4-Player","Local 5-Player","Local 6-Player","Local 7-Player","Local 8-Player"};
 
 	std::cout << "Fetching titles.json..." << std::endl;
-	std::string fetch = FetchRawHtml(L"raw.githubusercontent.com", L"/" + to_wstring(repo) + L"/refs/heads/main/titles.json");
+	std::string fetch = FetchRawHtml("raw.githubusercontent.com", "/" + repo + "/refs/heads/main/titles.json");
 	try {
 		images = json::parse(fetch);
 		std::cout << "Successfully fetched titles.json!" << std::endl;
@@ -436,6 +501,15 @@ int main() {
 			WSACleanup();
 			return 1;
 		}
+	#elif defined(__linux__) || defined(__APPLE__)
+		boost::asio::io_context io_context;
+
+		// Create UDP socket
+		// Bind to all interfaces on the specified port
+        udp::socket socket(io_context, udp::endpoint(udp::v4(), port));
+
+        char data[1024];
+        udp::endpoint sender_endpoint;
 	#endif
 
 	runIdleLoop = true;
@@ -456,9 +530,13 @@ int main() {
 				std::cerr << "recvfrom failed.\n";
 				break;
 			}
+			buffer[len] = '\0'; // Null-terminate
+			std::string message = buffer;
+		#elif defined(__linux__) || defined(__APPLE__)
+			size_t length = socket.receive_from(boost::asio::buffer(data), sender_endpoint);
+			message = std::string(data, length);
 		#endif
-		buffer[len] = '\0'; // Null-terminate
-		std::string message = buffer;
+		
 		try {
 			out = json::parse(message);
 			if (out["sender"] == "Wii U") {
