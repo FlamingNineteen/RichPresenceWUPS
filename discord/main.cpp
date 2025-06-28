@@ -22,6 +22,7 @@
 	#include <boost/asio/ip/tcp.hpp>
 	#include <boost/asio/ssl/error.hpp>
 	#include <boost/asio/ssl/stream.hpp>
+	#include <curl/curl.h>
 	namespace beast = boost::beast;
 	namespace http = beast::http;
 	namespace net = boost::asio;
@@ -65,6 +66,12 @@ void signalHandler(int signum) {
 
 // Callback function to write data to a string
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp) {
+	size_t totalSize = size * nmemb;
+	userp->append((char*)contents, totalSize);
+	return totalSize;
+}
+
+size_t CurlWriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp) {
 	size_t totalSize = size * nmemb;
 	userp->append((char*)contents, totalSize);
 	return totalSize;
@@ -261,7 +268,7 @@ time_t AdjustEpochToUTC(time_t localEpoch) {
 		return utcEpoch;
 	#elif defined(__linux__) || defined(__APPLE__)
 		long timezone_offset = timezone;
-    	return local_epoch + timezone_offset;
+    	return localEpoch + timezone_offset;
 	#endif
 }
 
@@ -306,47 +313,25 @@ std::string FetchRawHtml(std::string server, std::string path) {
 
 		return content;
 	#elif defined(__linux__) || defined(__APPLE__)
-		try {
-			std::string port = "443";
-			int version = 11;
+		CURL* curl = curl_easy_init();
+		if (!curl) return "CURL init failed";
 
-			net::io_context ioc;
-			ssl::context ctx(ssl::context::tlsv12_client);
-			ctx.set_default_verify_paths();
+		std::string content;
+		std::string url = "https://" + server + path;
 
-			beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
+		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &content);
+		curl_easy_setopt(curl, CURLOPT_USERAGENT, "DiscordWiiU/1.0");
+		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
-			if (!SSL_set_tlsext_host_name(stream.native_handle(), server.c_str()))
-				throw beast::system_error(
-					beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category()));
+		CURLcode res = curl_easy_perform(curl);
+		curl_easy_cleanup(curl);
 
-			tcp::resolver resolver(ioc);
-			auto const results = resolver.resolve(server, port);
-			beast::get_lowest_layer(stream).connect(results);
-			stream.handshake(ssl::stream_base::client);
-
-			http::request<http::string_body> req{http::verb::get, target, version};
-			req.set(http::field::host, server);
-			req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-
-			http::write(stream, req);
-
-			beast::flat_buffer buffer;
-			http::response<http::dynamic_body> res;
-			http::read(stream, buffer, res);
-
-			beast::error_code ec;
-			stream.shutdown(ec);
-			if (ec == net::error::eof) ec = {};
-			if (ec) throw beast::system_error{ec};
-
-			// Convert response body to a string and return it
-			std::ostringstream os;
-			os << beast::buffers_to_string(res.body().data());
-			return os.str();
-		} catch (...) {
-			return std::string("An error occured");
+		if (res != CURLE_OK) {
+			return std::string("CURL error: ") + curl_easy_strerror(res);
 		}
+		return content;
 	#endif
 	return "";
 }
@@ -387,8 +372,8 @@ int main() {
 
 	// Set up logging callback
 	if (logging) {
-		client->AddLogCallback([](auto message, auto severity) {
-			std::cout << "[" << EnumToString(severity) << "] " << message << std::endl;
+		client->AddLogCallback([](auto msg, auto severity) {
+			std::cout << "[" << EnumToString(severity) << "] " << msg << std::endl;
 		}, discordpp::LoggingSeverity::Info);
 	}
 
@@ -506,7 +491,7 @@ int main() {
 
 		// Create UDP socket
 		// Bind to all interfaces on the specified port
-        udp::socket socket(io_context, udp::endpoint(udp::v4(), port));
+        udp::socket socket(io_context, udp::endpoint(udp::v4(), PORT));
 
         char data[1024];
         udp::endpoint sender_endpoint;
@@ -514,7 +499,7 @@ int main() {
 
 	runIdleLoop = true;
 	std::thread tthread(CheckIdle, client);
-	std::string message;
+	std::string msg;
 
 	std::cout << "Listening for Wii U broadcasts on port " << PORT << "...\n";
 
@@ -531,14 +516,14 @@ int main() {
 				break;
 			}
 			buffer[len] = '\0'; // Null-terminate
-			std::string message = buffer;
+			std::string msg = buffer;
 		#elif defined(__linux__) || defined(__APPLE__)
 			size_t length = socket.receive_from(boost::asio::buffer(data), sender_endpoint);
-			message = std::string(data, length);
+			msg = std::string(data, length);
 		#endif
 		
 		try {
-			out = json::parse(message);
+			out = json::parse(msg);
 			if (out["sender"] == "Wii U") {
 				std::cout << "Received: " << buffer << std::endl;
 
@@ -548,7 +533,8 @@ int main() {
 				discordpp::Activity activity;
 				activity.SetType(discordpp::ActivityTypes::Playing);
 				activity.SetDetails(out["app"]);
-				activity.SetState(players[out["ctrls"]]);
+				int ctrl = out["ctrls"];
+				activity.SetState(players[ctrl]);
 				discordpp::ActivityAssets assets;
 				try {
 					std::string temp = images[out["long"]];

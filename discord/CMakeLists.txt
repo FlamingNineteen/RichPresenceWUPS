@@ -5,7 +5,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 
-add_executable(WiiURichPresence main.cpp app.rc)
+if(WIN32)
+    add_executable(WiiURichPresence main.cpp app.rc)
+else()
+    add_executable(WiiURichPresence main.cpp)
+endif()
 
 # Define some handy Social SDK variables
 set(DISCORD_SDK_ROOT "${CMAKE_SOURCE_DIR}/lib/discord_social_sdk")
@@ -34,6 +38,16 @@ target_link_libraries(WiiURichPresence PRIVATE ${DISCORD_LIB_PATH})
 
 # Set the runtime search path (RPATH) for Linux and macOS
 if(UNIX)
+    target_link_libraries(WiiURichPresence PRIVATE stdc++ pthread)
+    # Link Boost libraries
+    find_package(Boost REQUIRED COMPONENTS system)
+    target_link_libraries(WiiURichPresence PRIVATE Boost::system)
+    # Link OpenSSL libraries
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(WiiURichPresence PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+    # Link CURL
+    find_package(CURL REQUIRED)
+    target_link_libraries(WiiURichPresence PRIVATE CURL::libcurl)
     # Use RPATH when building
     set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
     # Set the RPATH to use the lib directory relative to the executable
