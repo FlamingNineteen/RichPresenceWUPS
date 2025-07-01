@@ -450,7 +450,7 @@ int main() {
 	std::string players[8] = {"Singleplayer","Local 2-Player","Local 3-Player","Local 4-Player","Local 5-Player","Local 6-Player","Local 7-Player","Local 8-Player"};
 
 	std::cout << "Fetching titles.json..." << std::endl;
-	std::string fetch = FetchRawHtml("raw.githubusercontent.com", "/" + repo + "/refs/heads/main/titles.json");
+	std::string fetch = FetchRawHtml("raw.githubusercontent.com", "/" + repo + "/main/titles.json");
 	try {
 		images = json::parse(fetch);
 		std::cout << "Successfully fetched titles.json!" << std::endl;
