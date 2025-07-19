@@ -280,6 +280,7 @@ INITIALIZE_PLUGIN() {
     WUPSConfigAPI_Init(configOptions, ConfigMenuOpenedCallback, ConfigMenuClosedCallback);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_ENABLED_CONFIG_ID, configEnabled, CONFIG_ENABLED_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_TIMESET_CONFIG_ID, configTimeset, CONFIG_TIMESET_DEFAULT_VALUE);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_DISPLAY_CONFIG_ID, configDisplay, CONFIG_DISPLAY_DEFAULT_VALUE);
     WUPSStorageAPI::SaveStorage();
 
     if (static_cast<int>(configDisplay) > 2) nnid = GetNnid();
