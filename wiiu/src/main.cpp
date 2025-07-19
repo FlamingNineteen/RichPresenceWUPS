@@ -1,3 +1,4 @@
+#include <algorithm> // Add this include for std::sort
 #include <atomic>
 #include <chrono>
 #include <dirent.h>
@@ -33,6 +34,7 @@
 
 #include <nn/acp/client.h>
 #include <nn/acp/title.h>
+#include <nn/act.h>
 
 /**
     Mandatory plugin information.
@@ -58,11 +60,7 @@ WUPS_USE_WUT_DEVOPTAB();           // Use the wut devoptabs
 WUPS_USE_STORAGE("rich_presence"); // Unique id for the storage api
 
 enum DisplayOptions {
-    NODISPLAY = 0, CTRLCOUNT = 1, CTRLCOUNTNODRC = 2,
-    NNID1 = 3, NNID2 = 4, NNID3 = 5,
-    NNID4 = 6, NNID5 = 7, NNID6 = 8,
-    NNID7 = 9, NNID8 = 10, NNID9 = 11,
-    NNID10 = 12, NNID11 = 13, NNID12 = 14,
+    NODISPLAY = 0, CTRLCOUNT = 1, CTRLCOUNTNODRC = 2, NNID = 3
 };
 
 #define CONFIG_ENABLED_DEFAULT_VALUE true
@@ -70,6 +68,7 @@ enum DisplayOptions {
 #define CONFIG_DISPLAY_DEFAULT_VALUE CTRLCOUNT
 
 std::jthread tthread;
+std::string nnid;
 int elapsed;
 bool configEnabled           = CONFIG_ENABLED_DEFAULT_VALUE;
 int configTimeset            = CONFIG_TIMESET_DEFAULT_VALUE;
@@ -78,9 +77,19 @@ std::string app              = "";
 std::string preapp           = "quantum random!!!11!";
 WPADChan channels[7]         = {WPAD_CHAN_0, WPAD_CHAN_1, WPAD_CHAN_2, WPAD_CHAN_3, WPAD_CHAN_4, WPAD_CHAN_5, WPAD_CHAN_6};
 
-int ctrlNum() {
+int ctrlNum(DisplayOptions display) {
+    int c;
+    switch (display) {
+        case CTRLCOUNT:
+            c = 0;
+            break;
+        case CTRLCOUNTNODRC:
+            c = -1;
+            break;
+        default:
+            return 0;
+    }
     WPADExtensionType extType;
-    int c = 0;
     for (int i = 0; i < 7; i++) {
         int32_t result = WPADProbe(channels[i], &extType);
         if (result != -1) {c++;}
@@ -153,11 +162,21 @@ void Broadcast(const std::string& json) {
     close(sock);
 }
 
+std::string GetNnid() {
+    if (static_cast<int>(configDisplay) > 2) {
+        char account_id[256];
+        nn::act::GetAccountId(account_id);
+        std::string stickyId = account_id;
+        return stickyId;
+    } else return "";
+}
+
 void GameLoop(std::stop_token stoken) {
     while (!stoken.stop_requested()) {
         if (app != "") {
-            int ctrls = ctrlNum();
-            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + RemoveSlashN(GetXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + "}";
+            int ctrls = ctrlNum(configDisplay);
+            nnid = GetNnid();
+            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + RemoveSlashN(GetXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"display\":" + std::to_string(static_cast<int>(configDisplay)) + "}";
             Broadcast(json);
         }
 
@@ -220,27 +239,16 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
 
         // Timeset integer range
         configCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_TIMESET_CONFIG_ID, "Offset \"elapsed time\" timezone for correct display",
-                                                        CONFIG_TIMESET_DEFAULT_VALUE, configTimeset,
-                                                        -12, 12,
-                                                        &integerRangeItemChanged));
+                                                         CONFIG_TIMESET_DEFAULT_VALUE, configTimeset,
+                                                         -12, 12,
+                                                         &integerRangeItemChanged));
         
         // Display options
         constexpr WUPSConfigItemMultipleValues::ValuePair displayOptValues[] = {
                 {NODISPLAY, "Nothing"},
                 {CTRLCOUNT, "Player Count"},
                 {CTRLCOUNTNODRC, "Player Count (exclude Gamepad)"},
-                {NNID1, "Network ID (User 1)"},
-                {NNID2, "Network ID (User 2)"},
-                {NNID3, "Network ID (User 3)"},
-                {NNID4, "Network ID (User 4)"},
-                {NNID5, "Network ID (User 5)"},
-                {NNID6, "Network ID (User 6)"},
-                {NNID7, "Network ID (User 7)"},
-                {NNID8, "Network ID (User 8)"},
-                {NNID9, "Network ID (User 9)"},
-                {NNID10, "Network ID (User 10)"},
-                {NNID11, "Network ID (User 11)"},
-                {NNID12, "Network ID (User 12)"},
+                {NNID, "Network ID"}
         };
 
         // Display multiselect
@@ -273,6 +281,8 @@ INITIALIZE_PLUGIN() {
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_ENABLED_CONFIG_ID, configEnabled, CONFIG_ENABLED_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_TIMESET_CONFIG_ID, configTimeset, CONFIG_TIMESET_DEFAULT_VALUE);
     WUPSStorageAPI::SaveStorage();
+
+    if (static_cast<int>(configDisplay) > 2) nnid = GetNnid();
 }
 
 ON_APPLICATION_START() {
