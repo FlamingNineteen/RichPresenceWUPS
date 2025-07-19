@@ -1,5 +1,6 @@
 #include <atomic>
 #include <chrono>
+#include <dirent.h>
 #include <malloc.h>
 #include <stdbool.h>
 #include <string.h>
@@ -15,6 +16,7 @@
 #include <wups/config/WUPSConfigCategory.h>
 #include <wups/config/WUPSConfigItemBoolean.h>
 #include <wups/config/WUPSConfigItemIntegerRange.h>
+#include <wups/config/WUPSConfigItemMultipleValues.h>
 #include <wups/config/WUPSConfigItemStub.h>
 #include <wups/config_api.h>
 
@@ -23,6 +25,8 @@
 #include <coreinit/thread.h>
 
 #include <arpa/inet.h>
+
+#include <sys/stat.h>
 
 #include <padscore/wpad.h>
 #include <padscore/kpad.h>
@@ -43,6 +47,7 @@ WUPS_PLUGIN_LICENSE("GNU");
 #define STACK_SIZE 0x2000
 #define CONFIG_ENABLED_CONFIG_ID "enabled"
 #define CONFIG_TIMESET_CONFIG_ID "timeset"
+#define CONFIG_DISPLAY_CONFIG_ID "display"
 
 /**
     All of these defines can be used in ANY file.
@@ -52,16 +57,26 @@ WUPS_PLUGIN_LICENSE("GNU");
 WUPS_USE_WUT_DEVOPTAB();           // Use the wut devoptabs
 WUPS_USE_STORAGE("rich_presence"); // Unique id for the storage api
 
+enum DisplayOptions {
+    NODISPLAY = 0, CTRLCOUNT = 1, CTRLCOUNTNODRC = 2,
+    NNID1 = 3, NNID2 = 4, NNID3 = 5,
+    NNID4 = 6, NNID5 = 7, NNID6 = 8,
+    NNID7 = 9, NNID8 = 10, NNID9 = 11,
+    NNID10 = 12, NNID11 = 13, NNID12 = 14,
+};
+
 #define CONFIG_ENABLED_DEFAULT_VALUE true
 #define CONFIG_TIMESET_DEFAULT_VALUE 0
+#define CONFIG_DISPLAY_DEFAULT_VALUE CTRLCOUNT
 
 std::jthread tthread;
 int elapsed;
-bool configEnabled   = CONFIG_ENABLED_DEFAULT_VALUE;
-int configTimeset    = CONFIG_TIMESET_DEFAULT_VALUE;
-std::string app      = "";
-std::string preapp   = "quantum random!!!11!";
-WPADChan channels[7] = {WPAD_CHAN_0, WPAD_CHAN_1, WPAD_CHAN_2, WPAD_CHAN_3, WPAD_CHAN_4, WPAD_CHAN_5, WPAD_CHAN_6};
+bool configEnabled           = CONFIG_ENABLED_DEFAULT_VALUE;
+int configTimeset            = CONFIG_TIMESET_DEFAULT_VALUE;
+DisplayOptions configDisplay = CONFIG_DISPLAY_DEFAULT_VALUE;
+std::string app              = "";
+std::string preapp           = "quantum random!!!11!";
+WPADChan channels[7]         = {WPAD_CHAN_0, WPAD_CHAN_1, WPAD_CHAN_2, WPAD_CHAN_3, WPAD_CHAN_4, WPAD_CHAN_5, WPAD_CHAN_6};
 
 int ctrlNum() {
     WPADExtensionType extType;
@@ -95,6 +110,30 @@ std::string RemoveSlashN(std::string s) {
         s.replace(finder, 1, " ");
     }
     return s;
+}
+
+std::vector<std::string> ListDirs(const char* path) {
+    std::vector<std::string> dirs;
+    DIR* dir = opendir(path);
+    if (!dir) {
+        return dirs;
+    }
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        // Skip "." and ".."
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+
+        // Build full path
+        std::string fullPath = std::string(path) + "/" + entry->d_name;
+        struct stat st;
+        if (stat(fullPath.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+            dirs.push_back(entry->d_name);
+        }
+    }
+    closedir(dir);
+    return dirs;
 }
 
 // Broadcast over port 5005
@@ -149,6 +188,15 @@ void integerRangeItemChanged(ConfigItemIntegerRange *item, int newValue) {
     }
 }
 
+void multipleValueItemChanged(ConfigItemMultipleValues *item, u_int32_t newValue) {
+    // If the value has changed, we store it in the storage.
+    if (std::string_view(CONFIG_DISPLAY_CONFIG_ID) == item->identifier) {
+        configDisplay = (DisplayOptions) newValue;
+        // If the value has changed, we store it in the storage.
+        WUPSStorageAPI::Store(item->identifier, newValue);
+    }
+}
+
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
     // Create a new WUPSConfigCategory from the root handle
     WUPSConfigCategory root = WUPSConfigCategory(rootHandle);
@@ -167,14 +215,39 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
 
         // Enabled boolean
         configCat.add(WUPSConfigItemBoolean::Create(CONFIG_ENABLED_CONFIG_ID, "Enabled",
-                                               CONFIG_ENABLED_DEFAULT_VALUE, configEnabled,
-                                               boolItemChanged));
+                                                    CONFIG_ENABLED_DEFAULT_VALUE, configEnabled,
+                                                    boolItemChanged));
 
         // Timeset integer range
         configCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_TIMESET_CONFIG_ID, "Offset \"elapsed time\" timezone for correct display",
-                                                    CONFIG_TIMESET_DEFAULT_VALUE, configTimeset,
-                                                    -12, 12,
-                                                    &integerRangeItemChanged));
+                                                        CONFIG_TIMESET_DEFAULT_VALUE, configTimeset,
+                                                        -12, 12,
+                                                        &integerRangeItemChanged));
+        
+        // Display options
+        constexpr WUPSConfigItemMultipleValues::ValuePair displayOptValues[] = {
+                {NODISPLAY, "Nothing"},
+                {CTRLCOUNT, "Player Count"},
+                {CTRLCOUNTNODRC, "Player Count (exclude Gamepad)"},
+                {NNID1, "Network ID (User 1)"},
+                {NNID2, "Network ID (User 2)"},
+                {NNID3, "Network ID (User 3)"},
+                {NNID4, "Network ID (User 4)"},
+                {NNID5, "Network ID (User 5)"},
+                {NNID6, "Network ID (User 6)"},
+                {NNID7, "Network ID (User 7)"},
+                {NNID8, "Network ID (User 8)"},
+                {NNID9, "Network ID (User 9)"},
+                {NNID10, "Network ID (User 10)"},
+                {NNID11, "Network ID (User 11)"},
+                {NNID12, "Network ID (User 12)"},
+        };
+
+        // Display multiselect
+        configCat.add(WUPSConfigItemMultipleValues::CreateFromValue(CONFIG_DISPLAY_CONFIG_ID, "Display under game name",
+                                                                    CONFIG_DISPLAY_DEFAULT_VALUE, configDisplay,
+                                                                    displayOptValues,
+                                                                    multipleValueItemChanged));
         
         root.add(std::move(configCat));
 
