@@ -536,8 +536,7 @@ int main() {
 				if (out["display"] > 0 && out["display"] < 3 && out["ctrls"] > -1) {
 					int ctrl = out["ctrls"];
 					activity.SetState(players[ctrl]);
-				} debug(2);
-				if (out["display"] == 3 && out["nnid"] != "") {
+				} else if (out["display"] == 3 && out["nnid"] != "") {
 					std::string nnid = out["nnid"];
 					activity.SetState(nnid);
 				}
