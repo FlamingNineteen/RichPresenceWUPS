@@ -533,8 +533,14 @@ int main() {
 				discordpp::Activity activity;
 				activity.SetType(discordpp::ActivityTypes::Playing);
 				activity.SetDetails(out["app"]);
-				int ctrl = out["ctrls"];
-				activity.SetState(players[ctrl]);
+				if (out["display"] > 0 && out["display"] < 3 && out["ctrls"] > -1) {
+					int ctrl = out["ctrls"];
+					activity.SetState(players[ctrl]);
+				} debug(2);
+				if (out["display"] == 3 && out["nnid"] != "") {
+					std::string nnid = out["nnid"];
+					activity.SetState(nnid);
+				}
 				discordpp::ActivityAssets assets;
 				try {
 					std::string temp = images[out["long"]];
