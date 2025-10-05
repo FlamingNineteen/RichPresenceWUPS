@@ -1,10 +1,9 @@
 .vscode/
-include/
-lib/
 app/
 build/
 resources/
 archive/
+ignore/
 *.bat
 *.sh
 *.elf
