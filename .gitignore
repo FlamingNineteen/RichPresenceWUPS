@@ -4,8 +4,6 @@ build/
 resources/
 archive/
 ignore/
-*.bat
-*.sh
 *.elf
 *.lst
 *.wps

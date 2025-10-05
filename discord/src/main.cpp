@@ -43,7 +43,7 @@ constexpr int UDP_PORT = 5005;
 static uint32_t FrustrationLevel = 0;
 static int64_t StartTime;
 static bool SendPresence = true;
-std::string repo = "flamingnineteen/richpresence-db";
+std::string repo = "flamingnineteen/richpresencewups-db";
 std::atomic<bool> idle = false;
 std::atomic<bool> runIdleLoop = true;
 
@@ -70,22 +70,22 @@ static void discordSetup() {
         });
 }
 
-static void updatePresence(std::string game, std::string nnid, int ctrls, std::string image) {
+static void updatePresence(std::string game, std::string nnid, int ctrls, std::string jpg) {
     auto& rpc = discord::RPCManager::get();
-    int maxParty = (ctrls > 4) ? 8 : 4;
     if (!SendPresence) {
         rpc.clearPresence();
         return;
     }
+    int maxParty = (ctrls > 4) ? 8 : 4;
 
     rpc.getPresence()
         .setState(game)
         .setActivityType(discord::ActivityType::Game)
         .setStatusDisplayType(discord::StatusDisplayType::State)
-        .setDetails(fmt::format("Network ID: {}", nnid))
+        .setDetails((nnid == "") ? "" : "Network ID: " + nnid)
         .setStartTimestamp(StartTime)
         .setEndTimestamp(time(nullptr) + 5 * 60)
-        .setLargeImageKey("https://raw.githubusercontent.com/" + repo + "/refs/heads/main/icons/nintendoland.jpg")
+        .setLargeImageKey((jpg == "oh no it didn't work") ? "preview" : ("https://raw.githubusercontent.com/" + repo + "/main/icons/" + jpg))
         .setPartyID("party1234")
         .setPartySize(ctrls)
         .setPartyMax(maxParty)
@@ -115,6 +115,92 @@ void CheckIdle() {
 }
 
 std::thread tthread(CheckIdle);
+
+time_t AdjustEpochToUTC(time_t localEpoch) {
+	#ifdef _WIN32
+		TIME_ZONE_INFORMATION tzInfo;
+		DWORD result = GetTimeZoneInformation(&tzInfo);
+
+		// Use only the standard time bias, ignoring daylight saving time
+		int bias = tzInfo.Bias;
+
+		// Convert bias from minutes to seconds and adjust the Epoch time
+		time_t utcEpoch = localEpoch + (bias * 60);
+		return utcEpoch;
+	#elif defined(__linux__) || defined(__APPLE__)
+		long timezone_offset = timezone;
+    	return localEpoch + timezone_offset;
+	#endif
+}
+
+std::wstring to_wstring(const std::string s) {
+	std::wstring ws(s.begin(), s.end());
+	return ws;
+}
+
+std::string FetchRawHtml(std::string server, std::string path) {
+	#ifdef _WIN32
+		std::wstring wserver = to_wstring(server);
+		std::wstring wpath = to_wstring(path);
+
+		HINTERNET hSession = WinHttpOpen(L"WURP", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, NULL, NULL, 0);
+		if (!hSession) return "";
+		
+		HINTERNET hConnect = WinHttpConnect(hSession, wserver.c_str(), INTERNET_DEFAULT_HTTPS_PORT, 0);
+		if (!hConnect) return "";
+		
+		HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", wpath.c_str(),
+												NULL, WINHTTP_NO_REFERER,
+												WINHTTP_DEFAULT_ACCEPT_TYPES,
+												WINHTTP_FLAG_SECURE);
+		
+		std::string content;
+		if (WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+								WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+			WinHttpReceiveResponse(hRequest, NULL)) {
+			
+			DWORD dwSize = 0;
+			do {
+				DWORD dwDownloaded = 0;
+				if (!WinHttpQueryDataAvailable(hRequest, &dwSize)) break;
+
+				if (dwSize > 0) {
+					std::vector<char> buffer(dwSize);
+					if (WinHttpReadData(hRequest, buffer.data(), dwSize, &dwDownloaded)) {
+						content.append(buffer.data(), dwDownloaded);
+					}
+				}
+			} while (dwSize > 0);
+		}
+
+		WinHttpCloseHandle(hRequest);
+		WinHttpCloseHandle(hConnect);
+		WinHttpCloseHandle(hSession);
+
+		return content;
+	#elif defined(__linux__) || defined(__APPLE__)
+		CURL* curl = curl_easy_init();
+		if (!curl) return "CURL init failed";
+
+		std::string content;
+		std::string url = "https://" + server + path;
+
+		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &content);
+		curl_easy_setopt(curl, CURLOPT_USERAGENT, "DiscordWiiU/1.0");
+		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+		CURLcode res = curl_easy_perform(curl);
+		curl_easy_cleanup(curl);
+
+		if (res != CURLE_OK) {
+			return std::string("CURL error: ") + curl_easy_strerror(res);
+		}
+		return content;
+	#endif
+	return "";
+}
 
 static void gameLoop() {
 	std::string msg;
@@ -163,9 +249,17 @@ static void gameLoop() {
 
     json out;
     json images;
+    std::string image;
     char buffer[1024];
 
-    fmt::println("You are standing in an open field west of a white house.");
+    std::string fetch = FetchRawHtml("raw.githubusercontent.com", "/" + repo + "/main/titles.json");
+	try {
+		images = json::parse(fetch);
+		std::cout << "Successfully fetched titles.json!" << std::endl;
+	} catch (...) {
+		std::cout << "Error fetching titles.json. Using default image." << std::endl;
+	}
+
     do {
         #ifdef _WIN32
             sockaddr_in sender {};
@@ -189,7 +283,14 @@ static void gameLoop() {
 
             idle = false;
         }
-        updatePresence(out["app"], "Flaming19", out["ctrls"], out["long"]);
+
+        try {
+            image = images[out["long"]];
+        } catch (...) {
+            image = "oh no it didn't work";
+        }
+
+        updatePresence(out["app"], out["nnid"], out["ctrls"], image);
     } while (true);
 
     #ifdef _WIN32

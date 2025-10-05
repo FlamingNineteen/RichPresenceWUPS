@@ -1,0 +1,1 @@
+start cmd /k build\src\Release\WiiURichPresence.exe
