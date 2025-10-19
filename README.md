@@ -5,15 +5,13 @@ This plugin uses UDP port 5005 to communicate with an application on your comput
 ## Installation
 (`[ENVIRONMENT]` is a placeholder for the actual environment name.)
 
-1. Download both `wurpWiiU.zip` and `wurpDiscord.zip` and extract both of them.
-2. From `wurpWiiU`, copy the file `RichPresence.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
-3. Keep the `wurpDiscord` folder on your computer.
+1. Download both `RichPresence.wps` and the executable associated with your operating system.
+2. Copy `RichPresence.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
+3. Keep the executable on your computer.
 4. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
 
 ## Usage
-Start your Wii U with the environment you placed the plugin in.
-
-Run `WiiURichPresence` in the `wurpDiscord` folder with the Discord app open.
+Start your Wii U with the environment you placed the plugin in, and run the executable file with the Discord app open.
 
 > [!IMPORTANT]
 > On Linux, if you get the error `Segmentation fault (core dumped)`, use `sudo`.
@@ -26,4 +24,5 @@ The plugin is missing images of many Wii U games. If you are interested in addin
 
 ## Building
 For specifics on building either the plugin or the executable, please check the respective directories.
+
 
