@@ -1,5 +1,5 @@
 #include <discord-rpc.hpp>
-#include <iostream>
+#include <thread>
 #include <fmt/format.h>
 #include <string>
 
@@ -252,9 +252,9 @@ static void gameLoop() {
     std::string fetch = fetchRawHtml("raw.githubusercontent.com", "/" + repo + "/main/titles.json");
 	try {
 		images = json::parse(fetch);
-		std::cout << "Successfully fetched titles.json!" << std::endl;
+		fmt::println("Successfully fetched titles.json!");
 	} catch (...) {
-		std::cout << "Error fetching titles.json. Using default image." << std::endl;
+		fmt::println("Error fetching titles.json. Using default image.");
 	}
 
     do {
@@ -273,21 +273,24 @@ static void gameLoop() {
             size_t length = socket.receive_from(boost::asio::buffer(data), sender_endpoint);
             msg = std::string(data, length);
         #endif
-
-        out = json::parse(msg);
-        if (out["sender"] == "Wii U") {
-            std::cout << "Received: " << buffer << std::endl;
-
-            idle = false;
-        }
-
         try {
-            image = images[out["long"]];
-        } catch (...) {
-            image = "oh no it didn't work";
-        }
+            out = json::parse(msg);
+            if (out["sender"] == "Wii U") {
+                
+                fmt::println("Received: {}", msg);
 
-        updatePresence(out["app"], out["nnid"], out["ctrls"], image, adjustEpochToUtc(out["time"]));
+                idle = false;
+            }
+
+            try {
+                image = images[out["long"]];
+            } catch (...) {
+                image = "oh no it didn't work";
+            }
+
+            updatePresence(out["app"], out["nnid"], out["ctrls"], image, adjustEpochToUtc(out["time"]));
+        }
+        catch (...) {}
     } while (true);
 
     #ifdef _WIN32

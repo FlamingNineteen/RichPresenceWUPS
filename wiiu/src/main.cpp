@@ -47,9 +47,9 @@ WUPS_PLUGIN_AUTHOR("Flaming19");
 WUPS_PLUGIN_LICENSE("GPL");
 
 #define STACK_SIZE 0x2000
-#define CONFIG_ENABLED_CONFIG_ID "enabled"
+#define CONFIG_NET_ID_CONFIG_ID "enabled"
 #define CONFIG_TIMESET_CONFIG_ID "timeset"
-#define CONFIG_DISPLAY_CONFIG_ID "display"
+#define CONFIG_CTRL_CONFIG_ID "display"
 
 /**
     All of these defines can be used in ANY file.
@@ -60,19 +60,19 @@ WUPS_USE_WUT_DEVOPTAB();           // Use the wut devoptabs
 WUPS_USE_STORAGE("rich_presence"); // Unique id for the storage api
 
 enum DisplayOptions {
-    NODISPLAY = 0, CTRLCOUNT = 1, CTRLCOUNTNODRC = 2, NNID = 3
+    NODISPLAY = 0, CTRLCOUNTNODRC = 1, CTRLCOUNT = 2
 };
 
-#define CONFIG_ENABLED_DEFAULT_VALUE true
+#define CONFIG_NET_ID_DEFAULT_VALUE true
 #define CONFIG_TIMESET_DEFAULT_VALUE 0
-#define CONFIG_DISPLAY_DEFAULT_VALUE CTRLCOUNT
+#define CONFIG_CTRL_DEFAULT_VALUE CTRLCOUNT
 
 std::jthread tthread;
 std::string nnid;
 int elapsed;
-bool configEnabled           = CONFIG_ENABLED_DEFAULT_VALUE;
+bool configNetId           = CONFIG_NET_ID_DEFAULT_VALUE;
 int configTimeset            = CONFIG_TIMESET_DEFAULT_VALUE;
-DisplayOptions configDisplay = CONFIG_DISPLAY_DEFAULT_VALUE;
+DisplayOptions configCtrl = CONFIG_CTRL_DEFAULT_VALUE;
 std::string app              = "";
 std::string preapp           = "quantum random!!!11!";
 WPADChan channels[7]         = {WPAD_CHAN_0, WPAD_CHAN_1, WPAD_CHAN_2, WPAD_CHAN_3, WPAD_CHAN_4, WPAD_CHAN_5, WPAD_CHAN_6};
@@ -87,7 +87,7 @@ int ctrlNum(DisplayOptions display) {
             c = -1;
             break;
         default:
-            return 0;
+            return -2;
     }
     WPADExtensionType extType;
     for (int i = 0; i < 7; i++) {
@@ -163,7 +163,7 @@ void Broadcast(const std::string& json) {
 }
 
 std::string GetNnid() {
-    if (static_cast<int>(configDisplay) > 2) {
+    if (configNetId) {
         char account_id[256];
         nn::act::GetAccountId(account_id);
         std::string stickyId = account_id;
@@ -174,9 +174,9 @@ std::string GetNnid() {
 void GameLoop(std::stop_token stoken) {
     while (!stoken.stop_requested()) {
         if (app != "") {
-            int ctrls = ctrlNum(configDisplay);
+            int ctrls = ctrlNum(configCtrl);
             nnid = GetNnid();
-            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + RemoveSlashN(GetXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"display\":" + std::to_string(static_cast<int>(configDisplay)) + "}";
+            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + RemoveSlashN(GetXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\"}";
             Broadcast(json);
         }
 
@@ -192,8 +192,8 @@ void GameLoop(std::stop_token stoken) {
  * Callback that will be called if the config has been changed
  */
 void boolItemChanged(ConfigItemBoolean *item, bool newValue) {
-    if (std::string_view(CONFIG_ENABLED_CONFIG_ID) == item->identifier) {
-        configEnabled = newValue;
+    if (std::string_view(CONFIG_NET_ID_CONFIG_ID) == item->identifier) {
+        configNetId = newValue;
         // If the value has changed, we store it in the storage.
         WUPSStorageAPI::Store(item->identifier, newValue);
     }
@@ -209,8 +209,8 @@ void integerRangeItemChanged(ConfigItemIntegerRange *item, int newValue) {
 
 void multipleValueItemChanged(ConfigItemMultipleValues *item, u_int32_t newValue) {
     // If the value has changed, we store it in the storage.
-    if (std::string_view(CONFIG_DISPLAY_CONFIG_ID) == item->identifier) {
-        configDisplay = (DisplayOptions) newValue;
+    if (std::string_view(CONFIG_CTRL_CONFIG_ID) == item->identifier) {
+        configCtrl = (DisplayOptions) newValue;
         // If the value has changed, we store it in the storage.
         WUPSStorageAPI::Store(item->identifier, newValue);
     }
@@ -231,10 +231,23 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         
         // Settings category
         auto configCat = WUPSConfigCategory::Create("Plugin settings");
+        
+        // Display options
+        constexpr WUPSConfigItemMultipleValues::ValuePair displayOptValues[] = {
+                {NODISPLAY, "none"},
+                {CTRLCOUNTNODRC, "exclude Gamepad"},
+                {CTRLCOUNT, "all"}
+        };
 
-        // Enabled boolean
-        configCat.add(WUPSConfigItemBoolean::Create(CONFIG_ENABLED_CONFIG_ID, "Enabled",
-                                                    CONFIG_ENABLED_DEFAULT_VALUE, configEnabled,
+        // Display multiselect
+        configCat.add(WUPSConfigItemMultipleValues::CreateFromValue(CONFIG_CTRL_CONFIG_ID, "Show controller count",
+                                                                    CONFIG_CTRL_DEFAULT_VALUE, configCtrl,
+                                                                    displayOptValues,
+                                                                    multipleValueItemChanged));
+        
+        // Network ID boolean
+        configCat.add(WUPSConfigItemBoolean::Create(CONFIG_NET_ID_CONFIG_ID, "Show Network ID",
+                                                    CONFIG_NET_ID_DEFAULT_VALUE, configNetId,
                                                     boolItemChanged));
 
         // Timeset integer range
@@ -242,20 +255,6 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
                                                          CONFIG_TIMESET_DEFAULT_VALUE, configTimeset,
                                                          -12, 12,
                                                          &integerRangeItemChanged));
-        
-        // Display options
-        constexpr WUPSConfigItemMultipleValues::ValuePair displayOptValues[] = {
-                {NODISPLAY, "Nothing"},
-                {CTRLCOUNT, "Player Count"},
-                {CTRLCOUNTNODRC, "Player Count (exclude Gamepad)"},
-                {NNID, "Network ID"}
-        };
-
-        // Display multiselect
-        configCat.add(WUPSConfigItemMultipleValues::CreateFromValue(CONFIG_DISPLAY_CONFIG_ID, "Display under game name",
-                                                                    CONFIG_DISPLAY_DEFAULT_VALUE, configDisplay,
-                                                                    displayOptValues,
-                                                                    multipleValueItemChanged));
         
         root.add(std::move(configCat));
 
@@ -278,12 +277,12 @@ void ConfigMenuClosedCallback() {
 INITIALIZE_PLUGIN() {
     WUPSConfigAPIOptionsV1 configOptions = {.name = "Rich Presence"};
     WUPSConfigAPI_Init(configOptions, ConfigMenuOpenedCallback, ConfigMenuClosedCallback);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_ENABLED_CONFIG_ID, configEnabled, CONFIG_ENABLED_DEFAULT_VALUE);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_NET_ID_CONFIG_ID, configNetId, CONFIG_NET_ID_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_TIMESET_CONFIG_ID, configTimeset, CONFIG_TIMESET_DEFAULT_VALUE);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_DISPLAY_CONFIG_ID, configDisplay, CONFIG_DISPLAY_DEFAULT_VALUE);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_CTRL_CONFIG_ID, configCtrl, CONFIG_CTRL_DEFAULT_VALUE);
     WUPSStorageAPI::SaveStorage();
 
-    if (static_cast<int>(configDisplay) > 2) nnid = GetNnid();
+    if (static_cast<int>(configCtrl) > 2) nnid = GetNnid();
 }
 
 ON_APPLICATION_START() {

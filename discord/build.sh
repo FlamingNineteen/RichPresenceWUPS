@@ -1,6 +1,2 @@
-mkdir build
-cd build
-cmake ..
-cmake --build . --config Release
-cd ../
-~/Downloads/discord/build/WiiURichPresence
+cmake -B build -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
