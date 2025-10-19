@@ -41,7 +41,6 @@ using json = nlohmann::json;
 constexpr auto APPLICATION_ID = "1353248127469228074";
 constexpr int UDP_PORT = 5005;
 static uint32_t FrustrationLevel = 0;
-static int64_t StartTime;
 static bool SendPresence = true;
 std::string repo = "flamingnineteen/richpresencewups-db";
 std::atomic<bool> idle = false;
@@ -70,7 +69,7 @@ static void discordSetup() {
         });
 }
 
-static void updatePresence(std::string game, std::string nnid, int ctrls, std::string jpg) {
+static void updatePresence(std::string game, std::string nnid, int ctrls, std::string jpg, time_t start) {
     auto& rpc = discord::RPCManager::get();
     if (!SendPresence) {
         rpc.clearPresence();
@@ -83,18 +82,18 @@ static void updatePresence(std::string game, std::string nnid, int ctrls, std::s
         .setActivityType(discord::ActivityType::Game)
         .setStatusDisplayType(discord::StatusDisplayType::State)
         .setDetails((nnid == "") ? "" : "Network ID: " + nnid)
-        .setStartTimestamp(StartTime)
-        .setEndTimestamp(time(nullptr) + 5 * 60)
+        .setStartTimestamp(start)
         .setLargeImageKey((jpg == "oh no it didn't work") ? "preview" : ("https://raw.githubusercontent.com/" + repo + "/main/icons/" + jpg))
-        .setPartyID("party1234")
-        .setPartySize(ctrls)
+        .setPartyID(ctrls > -2 ? "wiiu" : "")
+        .setPartySize(ctrls > -2 ? ctrls + 1 : 0)
         .setPartyMax(maxParty)
         .setPartyPrivacy(discord::PartyPrivacy::Public)
         .setInstance(false)
         .refresh();
+    fmt::println("Updated Rich Presence");
 }
 
-void CheckIdle() {
+void checkIdle() {
 	bool allow = true;
     auto& rpc = discord::RPCManager::get();
 	while (runIdleLoop) {
@@ -114,9 +113,9 @@ void CheckIdle() {
 	return;
 }
 
-std::thread tthread(CheckIdle);
+std::thread tthread(checkIdle);
 
-time_t AdjustEpochToUTC(time_t localEpoch) {
+time_t adjustEpochToUtc(time_t localEpoch) {
 	#ifdef _WIN32
 		TIME_ZONE_INFORMATION tzInfo;
 		DWORD result = GetTimeZoneInformation(&tzInfo);
@@ -133,15 +132,15 @@ time_t AdjustEpochToUTC(time_t localEpoch) {
 	#endif
 }
 
-std::wstring to_wstring(const std::string s) {
+std::wstring toWstring(const std::string s) {
 	std::wstring ws(s.begin(), s.end());
 	return ws;
 }
 
-std::string FetchRawHtml(std::string server, std::string path) {
+std::string fetchRawHtml(std::string server, std::string path) {
 	#ifdef _WIN32
-		std::wstring wserver = to_wstring(server);
-		std::wstring wpath = to_wstring(path);
+		std::wstring wserver = toWstring(server);
+		std::wstring wpath = toWstring(path);
 
 		HINTERNET hSession = WinHttpOpen(L"WURP", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, NULL, NULL, 0);
 		if (!hSession) return "";
@@ -186,7 +185,7 @@ std::string FetchRawHtml(std::string server, std::string path) {
 		std::string url = "https://" + server + path;
 
 		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
+		// curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &content);
 		curl_easy_setopt(curl, CURLOPT_USERAGENT, "DiscordWiiU/1.0");
 		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
@@ -237,7 +236,7 @@ static void gameLoop() {
 
         // Create UDP socket
         // Bind to all interfaces on the specified port
-        udp::socket socket(io_context, udp::endpoint(udp::v4(), PORT));
+        udp::socket socket(io_context, udp::endpoint(udp::v4(), UDP_PORT));
 
         char data[1024];
         udp::endpoint sender_endpoint;
@@ -245,14 +244,12 @@ static void gameLoop() {
 
     auto& rpc = discord::RPCManager::get();
 
-    StartTime = time(nullptr);
-
     json out;
     json images;
     std::string image;
     char buffer[1024];
 
-    std::string fetch = FetchRawHtml("raw.githubusercontent.com", "/" + repo + "/main/titles.json");
+    std::string fetch = fetchRawHtml("raw.githubusercontent.com", "/" + repo + "/main/titles.json");
 	try {
 		images = json::parse(fetch);
 		std::cout << "Successfully fetched titles.json!" << std::endl;
@@ -290,7 +287,7 @@ static void gameLoop() {
             image = "oh no it didn't work";
         }
 
-        updatePresence(out["app"], out["nnid"], out["ctrls"], image);
+        updatePresence(out["app"], out["nnid"], out["ctrls"], image, adjustEpochToUtc(out["time"]));
     } while (true);
 
     #ifdef _WIN32
