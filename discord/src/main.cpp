@@ -1,6 +1,7 @@
 #include <discord-rpc.hpp>
 #include <thread>
 #include <fmt/format.h>
+// #include <resource.h>
 #include <string>
 
 #include "json.hpp"
@@ -70,11 +71,8 @@ static void discordSetup() {
 }
 
 static void updatePresence(std::string game, std::string nnid, int ctrls, std::string jpg, time_t start) {
+    idle = false;
     auto& rpc = discord::RPCManager::get();
-    if (!SendPresence) {
-        rpc.clearPresence();
-        return;
-    }
     int maxParty = (ctrls > 4) ? 8 : 4;
 
     rpc.getPresence()
@@ -94,19 +92,20 @@ static void updatePresence(std::string game, std::string nnid, int ctrls, std::s
 }
 
 void checkIdle() {
-	bool allow = true;
+	bool allow = false;
     auto& rpc = discord::RPCManager::get();
 	while (runIdleLoop) {
-		std::this_thread::sleep_for(std::chrono::seconds(8));
+		std::this_thread::sleep_for(std::chrono::seconds(5));
 		if (idle) {
             if (allow) {
-                if (!SendPresence) {
-                    rpc.clearPresence();
-                }
+                rpc.clearPresence();
+                fmt::println("Cleared Rich Presence");
+            } else {
+                allow = true;
             }
         }
         else {
-            allow = true;
+            allow = false;
         }
 		idle = true;
 	}
@@ -207,14 +206,14 @@ static void gameLoop() {
     #ifdef _WIN32
         WSADATA wsaData;
         if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-            std::cerr << "WSAStartup failed.\n";
+            fmt::println("WSAStartup failed.");
             return;
         }
 
         // Create UDP socket
         SOCKET sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 		if (sock == INVALID_SOCKET) {
-			std::cerr << "Socket creation failed.\n";
+			fmt::println("Socket creation failed.");
 			WSACleanup();
 			return;
 		}
@@ -226,7 +225,7 @@ static void gameLoop() {
         addr.sin_addr.s_addr = INADDR_ANY;
 
         if (bind(sock, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
-            std::cerr << "Bind failed.\n";
+            fmt::println("Bind failed.");
             closesocket(sock);
             WSACleanup();
             return;
@@ -264,7 +263,7 @@ static void gameLoop() {
             int len = recvfrom(sock, buffer, sizeof(buffer) - 1, 0,
                             (sockaddr*)&sender, &senderLen);
             if (len == SOCKET_ERROR) {
-                std::cerr << "recvfrom failed.\n";
+                fmt::println("recvfrom failed.");
                 break;
             }
             buffer[len] = '\0'; // Null-terminate

@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.21)
 
-if (WIN32)
-  add_executable(WiiURichPresence main.cpp app.rc)
-else()
+# Commented code is for adding icon
+# if (WIN32)
+#   add_executable(WiiURichPresence main.cpp resource.rc)
+# else()
   add_executable(WiiURichPresence main.cpp)
-endif()
+# endif()
 
 target_link_libraries(WiiURichPresence PRIVATE ${PROJECT_NAME} fmt)
 if (UNIX)
