@@ -2,6 +2,7 @@ import asyncio
 import json
 import requests
 import socket
+import time
 
 from datetime import datetime
 from pypresence import Presence
@@ -12,7 +13,15 @@ REPO = "flamingnineteen/richpresencewups-db"
 
 # Connect to Discord
 client = Presence(client_id = APP_ID)
-client.connect()
+
+disconnected = True
+while disconnected:
+    try:
+        client.connect()
+        disconnected = False
+    except:
+        print("Failed to connect to Discord. Retrying...")
+        time.sleep(1)
 print("Connected to Discord")
 
 # Bind Socket
