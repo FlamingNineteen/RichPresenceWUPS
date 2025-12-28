@@ -26,13 +26,17 @@ Make sure that [`pypresence`](https://github.com/qwertyquerty/pypresence) and `r
 pip install requests pypresence
 ```
 
-Start your Wii U with the environment you placed the plugin in, and run the executable file with the Discord app open.
+Start your Wii U with the environment you placed the plugin in, and run the Python file `discord-script.py` with the Discord app open.
+```
+python3 discord-script.py
+```
 
 ## Contribute
 The plugin is missing images of many Wii U games. If you are interested in adding game images, and have a Github account, check out the [image repository](https://github.com/flamingnineteen/RichPresenceWUPS-DB) for this plugin.
 
 ## Building
 For specifics on building either the plugin or the executable, please check the respective directories.
+
 
 
 
