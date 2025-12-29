@@ -2,6 +2,9 @@
 #include <atomic>
 #include <chrono>
 #include <dirent.h>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
 #include <malloc.h>
 #include <stdbool.h>
 #include <string.h>
@@ -29,6 +32,8 @@
 
 #include <sys/stat.h>
 
+#include <mocha/mocha.h>
+
 #include <padscore/wpad.h>
 #include <padscore/kpad.h>
 
@@ -47,9 +52,6 @@ WUPS_PLUGIN_AUTHOR("Flaming19");
 WUPS_PLUGIN_LICENSE("GPL");
 
 #define STACK_SIZE 0x2000
-#define CONFIG_NET_ID_CONFIG_ID "enabled"
-#define CONFIG_TIMESET_CONFIG_ID "timeset"
-#define CONFIG_CTRL_CONFIG_ID "display"
 
 /**
     All of these defines can be used in ANY file.
@@ -64,19 +66,30 @@ enum DisplayOptions {
 };
 
 #define CONFIG_NET_ID_DEFAULT_VALUE true
+#define CONFIG_SMALL_IMG_DEFAULT_VALUE true
 #define CONFIG_TIMESET_DEFAULT_VALUE 0
 #define CONFIG_CTRL_DEFAULT_VALUE CTRLCOUNT
 
+#define CONFIG_NET_ID_CONFIG_ID "enabled"
+#define CONFIG_TIMESET_CONFIG_ID "timeset"
+#define CONFIG_CTRL_CONFIG_ID "display"
+#define CONFIG_SMALL_IMG_CONFIG_ID "smallimg"
+
+bool configNetId          = CONFIG_NET_ID_DEFAULT_VALUE;
+int configTimeset         = CONFIG_TIMESET_DEFAULT_VALUE;
+DisplayOptions configCtrl = CONFIG_CTRL_DEFAULT_VALUE;
+bool configSmallImg       = CONFIG_SMALL_IMG_DEFAULT_VALUE;
+
 std::jthread tthread;
 std::string nnid;
+bool INKAY_EXISTS;
+std::string INKAY_CONFIG;
 int elapsed;
-bool configNetId           = CONFIG_NET_ID_DEFAULT_VALUE;
-int configTimeset            = CONFIG_TIMESET_DEFAULT_VALUE;
-DisplayOptions configCtrl = CONFIG_CTRL_DEFAULT_VALUE;
 std::string app              = "";
 std::string preapp           = "quantum random!!!11!";
 WPADChan channels[7]         = {WPAD_CHAN_0, WPAD_CHAN_1, WPAD_CHAN_2, WPAD_CHAN_3, WPAD_CHAN_4, WPAD_CHAN_5, WPAD_CHAN_6};
 
+// Returns the number of connected controllers
 int ctrlNum(DisplayOptions display) {
     int c;
     switch (display) {
@@ -97,6 +110,7 @@ int ctrlNum(DisplayOptions display) {
     return c;
 }
 
+// Gets a tag from the application's xml
 std::string GetXmlTag(std::string tag) {
     std::string result;
     ACPInitialize();
@@ -112,6 +126,7 @@ std::string GetXmlTag(std::string tag) {
     return result;
 }
 
+// Removes any instances of \n from a string
 std::string RemoveSlashN(std::string s) {
     while (true) {
         size_t finder = s.find("\n");
@@ -162,6 +177,7 @@ void Broadcast(const std::string& json) {
     close(sock);
 }
 
+// Gets the network id of the current account.
 std::string GetNnid() {
     if (configNetId) {
         char account_id[256];
@@ -171,12 +187,51 @@ std::string GetNnid() {
     } else return "";
 }
 
+/**
+ * Gets the currently used network.
+ * Network is decided by the Inkay config file.
+ * @returns
+ * `nn` for Nintendo,
+ * `pn` for Pretendo,
+ * nothing for neither
+ */
+std::string GetNetwork() {
+    if (configSmallImg) {
+        if (INKAY_EXISTS) {
+            std::ifstream acc(INKAY_CONFIG);
+            if (!acc.is_open()) {
+                return "";
+            }
+
+            size_t pos;
+            std::string line;
+            while (std::getline(acc, line)) {
+                pos = line.find("connect_to_network");
+                if (pos != std::string::npos) {
+                    pos = line.find("true");
+                    if (pos != std::string::npos) {
+                        return "pn";
+                    } else {
+                        return "nn";
+                    }
+                }
+            }
+            return "nn";
+        } else {
+            return "nn";
+        }
+    } else {
+        return "";
+    }
+}
+
+// Main background loop to broadcast current info
 void GameLoop(std::stop_token stoken) {
     while (!stoken.stop_requested()) {
         if (app != "") {
             int ctrls = ctrlNum(configCtrl);
             nnid = GetNnid();
-            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + RemoveSlashN(GetXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\"}";
+            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + RemoveSlashN(GetXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + GetNetwork() + "\"}";
             Broadcast(json);
         }
 
@@ -189,11 +244,17 @@ void GameLoop(std::stop_token stoken) {
 }
 
 /**
- * Callback that will be called if the config has been changed
+ * Callbacks that will be called if the config has been changed
  */
 void boolItemChanged(ConfigItemBoolean *item, bool newValue) {
     if (std::string_view(CONFIG_NET_ID_CONFIG_ID) == item->identifier) {
         configNetId = newValue;
+        // If the value has changed, we store it in the storage.
+        WUPSStorageAPI::Store(item->identifier, newValue);
+    }
+
+    if (std::string_view(CONFIG_SMALL_IMG_CONFIG_ID) == item->identifier) {
+        configSmallImg = newValue;
         // If the value has changed, we store it in the storage.
         WUPSStorageAPI::Store(item->identifier, newValue);
     }
@@ -250,6 +311,11 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
                                                     CONFIG_NET_ID_DEFAULT_VALUE, configNetId,
                                                     boolItemChanged));
 
+        // Small image boolean
+        configCat.add(WUPSConfigItemBoolean::Create(CONFIG_SMALL_IMG_CONFIG_ID, "Show currently used network",
+                                                    CONFIG_SMALL_IMG_DEFAULT_VALUE, configSmallImg,
+                                                    boolItemChanged));
+
         // Timeset integer range
         configCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_TIMESET_CONFIG_ID, "Offset \"elapsed time\" timezone for correct display",
                                                          CONFIG_TIMESET_DEFAULT_VALUE, configTimeset,
@@ -275,14 +341,22 @@ void ConfigMenuClosedCallback() {
 }
 
 INITIALIZE_PLUGIN() {
+    Mocha_InitLibrary();
+
     WUPSConfigAPIOptionsV1 configOptions = {.name = "Rich Presence"};
     WUPSConfigAPI_Init(configOptions, ConfigMenuOpenedCallback, ConfigMenuClosedCallback);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_NET_ID_CONFIG_ID, configNetId, CONFIG_NET_ID_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_TIMESET_CONFIG_ID, configTimeset, CONFIG_TIMESET_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_CTRL_CONFIG_ID, configCtrl, CONFIG_CTRL_DEFAULT_VALUE);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_SMALL_IMG_CONFIG_ID, configSmallImg, CONFIG_SMALL_IMG_DEFAULT_VALUE);
     WUPSStorageAPI::SaveStorage();
 
     if (static_cast<int>(configCtrl) > 2) nnid = GetNnid();
+
+    char environment_path_buffer[0x100];
+    Mocha_GetEnvironmentPath(environment_path_buffer, sizeof(environment_path_buffer));
+    INKAY_CONFIG = std::string(environment_path_buffer) + std::string("/plugins/config/inkay.json");
+    INKAY_EXISTS = std::filesystem::exists(INKAY_CONFIG);
 }
 
 ON_APPLICATION_START() {
@@ -309,4 +383,6 @@ DEINITIALIZE_PLUGIN() {
         tthread.request_stop();
         tthread.join(); // Wait for thread to finish
     }
+
+    Mocha_DeInitLibrary();
 }
