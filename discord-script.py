@@ -60,53 +60,56 @@ async def clearPresence():
         await asyncio.sleep(5)
         if idle:
             if allow:
-                await asyncio.to_thread(client.clear)
+                await asyncio.to_thread(client.clear) # TODO: RICH PRESENCE DOES NOT CLEAR
                 print("Cleared Rich Presence")
                 while idle:
-                    pass
+                    await asyncio.sleep(0.1)
             else:
                 allow = True
         else:
             allow = False
         idle = True
 
-asyncio.run(clearPresence())
+async def main():
+    global idle
+    while 1:
+        print("Waiting to recieve message")
+        msg = await asyncio.to_thread(sock.recv, 1024)
+        data = parse(str(msg))
+        print(f"Recieved: {data}")
+        idle = False
 
-while 1:
-    print("Waiting to recieve message")
-    msg = sock.recv(1024)
-    data = parse(str(msg))
-    print(f"Recieved: {data}")
-    idle = False
+        try:
+            if (data["sender"] == "Wii U"):
+                img = ""
+                try:
+                    img = f"https://raw.githubusercontent.com/{REPO}/main/icons/{titles[data["long"]]}"
+                except:
+                    img = "preview"
 
-    try:
-        if (data["sender"] == "Wii U"):
-            img = ""
-            try:
-                img = f"https://raw.githubusercontent.com/{REPO}/main/icons/{titles[data["long"]]}"
-            except:
-                img = "preview"
-
-            if data["nnid"] == '':
-                client.update(
+                await asyncio.to_thread(client.update,
                     activity_type=       ActivityType.PLAYING,
                     status_display_type= StatusDisplayType.STATE,
                     state=               data["app"],
+                    details=             None if data["nnid"] == '' else f"Network ID: {data["nnid"]}",
                     start=               toepoch(data["time"]),
                     large_image=         img,
-                    party_size=          [data["ctrls"] + 1 if data["ctrls"] > -2 else 0, 4 if data["ctrls"] < 4 else 8]
+                    large_text=          data["long"],
+                    party_size=          [data["ctrls"] + 1 if data["ctrls"] > -2 else 0, 4 if data["ctrls"] < 4 else 8],
+                    small_image=         None if data["img"] == "" else data["img"],
+                    small_text=          "Using Nintendo Network"
                 )
-            else:
-                client.update(
-                    activity_type=       ActivityType.PLAYING,
-                    status_display_type= StatusDisplayType.STATE,
-                    state=               data["app"],
-                    details=             f"Network ID: {data["nnid"]}",
-                    start=               toepoch(data["time"]),
-                    large_image=         img,
-                    party_size=          [data["ctrls"] + 1 if data["ctrls"] > -2 else 0, 4 if data["ctrls"] < 4 else 8]
-                )
-    except:
-        print("Updated Rich Presence")
+
+                print("Updated Rich Presence")
+        except:
+            print("Failed to update Rich Presence")
+
+async def run_all():
+    await asyncio.gather(
+        clearPresence(),
+        main()
+    )
+
+asyncio.run(run_all())
 
 sock.close()
