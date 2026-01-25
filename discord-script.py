@@ -105,7 +105,7 @@ async def main():
                     large_text=          data["long"],
                     party_size=          [data["ctrls"] + 1 if data["ctrls"] > -2 else 0, 4 if data["ctrls"] < 4 else 8],
                     small_image=         None if data["img"] == "" else data["img"],
-                    small_text=          "Using Nintendo Network"
+                    small_text=          f"Using {"Nintendo" if data["img"] == "nn" else "Pretendo"} Network"
                 )
 
                 print("Updated Rich Presence")
