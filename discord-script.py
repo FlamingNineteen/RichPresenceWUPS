@@ -2,6 +2,7 @@ import asyncio
 import json
 import requests
 import socket
+import sys
 import time
 
 from datetime import datetime
@@ -9,7 +10,7 @@ from pypresence import Presence
 from pypresence.types import ActivityType, StatusDisplayType
 
 APP_ID = "1353248127469228074"
-REPO = "flamingnineteen/richpresencewups-db"
+REPO = "flamingnineteen/richpresencewups-db" if len(sys.argv) < 2 else sys.argv[2]
 
 # Connect to Discord
 client = Presence(client_id = APP_ID)
@@ -28,7 +29,15 @@ print("Connected to Discord")
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 ip = socket.gethostbyname(socket.gethostname())
 
-sock.bind((ip, 5005))
+binded = False
+while not binded:
+    try:
+        sock.bind((ip, 5005))
+        binded = True
+        print("Binded to UDP port 5005")
+    except:
+        print("Failed to bind to UDP port 5005. Is another program using the port? Retrying...")
+        time.sleep(2)
 
 # Recieve Image URLs
 titles = {}
