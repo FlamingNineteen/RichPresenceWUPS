@@ -3,7 +3,7 @@
 This plugin uses UDP port 5005 to communicate with an application on your computer to set Discord Rich Presence for the user. The activity is set based on the application currently being played, the time the application was loaded, and the amount of controllers connected.
 
 > [!NOTE]
-> Elapsed time may not show up correctly because of daylight savings time or other causes. To offset the elapsed time that shows up in Discord by a certain amount of hours, open the plugin configuration menu and change the setting. If elapsed time displays `0:00:00`, you need to change the setting to a negative number. If elapsed time displays hours ahead of your actual play time, you need to change the setting to a positive number.
+> Elapsed time may not show up correctly because of daylight savings time or other causes. To offset the elapsed time that shows up in Discord by a certain amount of hours, open the plugin configuration menu and change the "Offset 'elapsed time' timezone for correct display" setting. If elapsed time displays `0:00:00`, you need to change the setting to a negative number. If elapsed time displays hours ahead of your actual play time, you need to change the setting to a positive number.
 
 ## Installation
 (`[ENVIRONMENT]` is a placeholder for the actual environment name.)
@@ -15,9 +15,6 @@ This plugin uses UDP port 5005 to communicate with an application on your comput
 
 ## Usage (Executable)
 Start your Wii U with the environment you placed the plugin in, and run the executable file with the Discord app open.
-
-> [!IMPORTANT]
-> On Linux, if you get the error `Segmentation fault (core dumped)`, use `sudo`.
 
 ## Usage (Python)
 Make sure that [`pypresence`](https://github.com/qwertyquerty/pypresence) and `requests` are installed

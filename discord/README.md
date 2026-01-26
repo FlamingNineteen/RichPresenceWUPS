@@ -1,14 +1,12 @@
 ## Building
 
 For building you need:
-- [boost](https://www.boost.org/releases/latest/) (Linux and macOS only)
-- [curl](https://curl.se) (Linux and macOS only)
+- [boost](https://www.boost.org/releases/latest/) (UNIX devices only)
+- [curl](https://curl.se) (UNIX devices only)
 
 Then run the following commands:
 ```
-mkdir build
-cd build
+mkdir build && cd build
 cmake ..
-cmake --build . --config Release
-
+cmake --build .
 ```

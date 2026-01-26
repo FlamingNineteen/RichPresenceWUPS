@@ -122,6 +122,7 @@ static void gameLoop(std::string repo) {
     SOCKET sock;
     while(!bind(sock)) {
         fmt::println("Retrying...");
+        std::this_thread::sleep_for(std::chrono::seconds(2));
     };
     fmt::println("Successfully binded to UDP port 5005");
 

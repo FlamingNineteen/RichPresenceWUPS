@@ -1,4 +1,5 @@
 #include "common.hpp"
+#include <iostream>
 
 #include <boost/asio.hpp>
 #include <boost/beast/core.hpp>
@@ -16,6 +17,9 @@ namespace ssl = net::ssl;
 using tcp = net::ip::tcp;
 using boost::asio::ip::udp;
 
+#include "json.hpp"
+using json = nlohmann::json;
+
 #ifdef __linux__
 	#include <unistd.h>
 #elif __APPLE__
@@ -27,6 +31,12 @@ time_t adjustEpochToUtc(time_t localEpoch) {
 	return localEpoch + timezone_offset;
 }
 
+size_t writeCallback(void* contents, size_t size, size_t nmemb, void* userp)
+{
+    ((std::string*)userp)->append((char*)contents, size *nmemb);
+    return size *nmemb;
+}
+
 std::string fetchRawHtml(std::string server, std::string path) {
 	CURL* curl = curl_easy_init();
 	if (!curl) return "CURL init failed";
@@ -35,7 +45,7 @@ std::string fetchRawHtml(std::string server, std::string path) {
 	std::string url = "https://" + server + path;
 
 	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-	// curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWriteCallback);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &content);
 	curl_easy_setopt(curl, CURLOPT_USERAGENT, "DiscordWiiU/1.0");
 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
@@ -70,10 +80,22 @@ static void gameLoop(std::string repo) {
 
 	// Create UDP socket
 	// Bind to all interfaces on the specified port
-	udp::socket socket(io_context, udp::endpoint(udp::v4(), UDP_PORT));
-
-	char data[1024];
+	udp::socket socket = udp::socket(io_context);
 	udp::endpoint sender_endpoint;
+	char data[1024];
+
+	bool binded = false;
+	while (!binded) {
+		try {
+			socket = udp::socket(io_context, udp::endpoint(udp::v4(), UDP_PORT));
+			binded = true;
+		}
+		catch (...) {
+			fmt::println("Failed to bind to UDP port 5005. Is another program using the port? Retrying...");
+			std::this_thread::sleep_for(std::chrono::seconds(2));
+		}
+	}
+	fmt::println("Successfully binded to UDP port 5005");
 
     auto& rpc = discord::RPCManager::get();
 
