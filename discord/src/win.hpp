@@ -160,7 +160,12 @@ static void gameLoop(std::string repo) {
                 image = "oh no it didn't work";
             }
 
-            updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"]));
+            if (out.contains("img")) { // Update 2.0
+                updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"]));
+            }
+            else { // Update 1.9
+                updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, "backwards", adjustEpochToUtc(out["time"]));
+            }
         }
         catch (...) {}
     } while (true);

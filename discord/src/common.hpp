@@ -23,7 +23,7 @@ static void discordSetup() {
 static void updatePresence(std::string repo, std::string game, std::string full, std::string nnid, int ctrls, std::string jpg, std::string img, time_t start) {
     idle = false;
     auto& rpc = discord::RPCManager::get();
-    int maxParty = (ctrls > 4) ? 8 : 4;
+    int maxParty = (ctrls + 1 > 4) ? 8 : 4;
 
     rpc.getPresence()
         .setState(game)
@@ -33,7 +33,7 @@ static void updatePresence(std::string repo, std::string game, std::string full,
         .setStartTimestamp(start)
         .setLargeImageKey((jpg == "oh no it didn't work") ? "preview" : ("https://raw.githubusercontent.com/" + repo + "/main/icons/" + jpg))
         .setLargeImageText(full)
-        .setSmallImageKey(img)
+        .setSmallImageKey(img == "backwards" ? "" : img)
         .setSmallImageText(img == "nn" ? "Using Nintendo Network" : "Using Pretendo Network")
         .setPartyID(ctrls > -2 ? "wiiu" : "")
         .setPartySize(ctrls > -2 ? ctrls + 1 : 0)
