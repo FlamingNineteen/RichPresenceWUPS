@@ -25,7 +25,7 @@ if (NOT TARGET fmt::fmt OR NOT TARGET glaze::glaze)
   endif()
 endif()
 
-target_link_libraries(${PROJECT_NAME} PRIVATE fmt glaze::glaze)
+target_link_libraries(${PROJECT_NAME} PRIVATE fmt::fmt glaze::glaze)
 
 if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   set(DISCORD_RPC_BUILD_TESTS ON)
