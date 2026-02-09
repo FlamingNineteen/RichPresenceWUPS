@@ -115,12 +115,19 @@ std::string GetXmlTag(std::string tag) {
     std::string result;
     ACPInitialize();
     auto *metaXml = (ACPMetaXml *) memalign(0x40, sizeof(ACPMetaXml));
-    if (ACPGetTitleMetaXml(OSGetTitleID(), metaXml) == ACP_RESULT_SUCCESS) {
-        if (tag == "longname_en") result       = metaXml->longname_en;
-        else if (tag == "shortname_en") result = metaXml->shortname_en;
-        else result.clear();
-    } else {
-        result.clear();
+    if (metaXml)
+    {
+        if (ACPGetTitleMetaXml(OSGetTitleID(), metaXml) == ACP_RESULT_SUCCESS)
+        {
+            if (tag == "longname_en") result = metaXml->longname_en;
+            else if (tag == "shortname_en") result = metaXml->shortname_en;
+            else result.clear();
+        }
+        else
+        {
+            result.clear();
+        }
+        free(metaXml);
     }
     ACPFinalize();
     return result;
