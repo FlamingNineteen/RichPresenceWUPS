@@ -10,7 +10,13 @@ from pypresence import Presence
 from pypresence.types import ActivityType, StatusDisplayType
 
 APP_ID = "1353248127469228074"
-REPO = "flamingnineteen/richpresencewups-db" if len(sys.argv) < 2 else sys.argv[2]
+REPO = "flamingnineteen/richpresencewups-db"
+i = 2
+while i < len(sys.argv):
+    if (sys.argv[i - 1] == "repo"):
+        REPO = sys.argv[i]
+        print(f"Using repository {REPO}.")
+    i+=1
 
 # Connect to Discord
 client = Presence(client_id = APP_ID)

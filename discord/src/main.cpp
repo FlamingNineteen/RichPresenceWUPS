@@ -10,18 +10,14 @@ std::string repo = "flamingnineteen/richpresencewups-db";
 std::thread tthread(checkIdle);
 
 int main(int argc, char* argv[]) {
-    if (argc > 1) {
-        int i = 1;
-        while (i < argc) {
-            // More commands can be added here in the future
-            fmt::println("{}", argv[i]);
-            if (std::strcmp(argv[i], "repo") == 0) {
-                i++;
-                repo = argv[i];
-                fmt::println("Using repository {}.", repo);
-            }
-            i++;
+    int i = 2;
+    while (i < argc) {
+        // More commands can be added here in the future
+        if (std::strcmp(argv[i - 1], "repo") == 0) {
+            repo = argv[i];
+            fmt::println("Using repository {}.", repo);
         }
+        i++;
     }
     discordSetup();
     discord::RPCManager::get().initialize();
