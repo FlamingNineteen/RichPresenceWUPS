@@ -1,5 +1,7 @@
 #include "windows.hpp"
 #include <array>
+#include <memory>
+#include <sddl.h>
 #include <WinSock2.h>
 #include <fmt/format.h>
 
@@ -16,21 +18,119 @@ namespace wine {
         return wine;
     }
 
-    static std::string getTempPath() {
-        wchar_t const* envVars[] = {L"XDG_RUNTIME_DIR", L"TMPDIR", L"TMP", L"TEMP"};
+    // https://stackoverflow.com/a/28523686
+    struct heap_delete {
+        using pointer = LPVOID;
 
-        wchar_t buffer[MAX_PATH];
-        for (auto const& var : envVars) {
-            DWORD result = ::GetEnvironmentVariableW(var, buffer, MAX_PATH);
-            if (result > 0 && result < MAX_PATH) {
-                int len = WideCharToMultiByte(CP_UTF8, 0, buffer, result, nullptr, 0, nullptr, nullptr);
-                std::string path(len, '\0');
-                WideCharToMultiByte(CP_UTF8, 0, buffer, result, path.data(), len, nullptr, nullptr);
-                return path;
-            }
+        void operator()(LPVOID p) const {
+            ::HeapFree(::GetProcessHeap(), 0, p);
+        }
+    };
+
+    struct handle_delete {
+        using pointer = HANDLE;
+
+        void operator()(HANDLE p) const {
+            ::CloseHandle(p);
+        }
+    };
+
+    using heap_unique_ptr = std::unique_ptr<LPVOID, heap_delete>;
+    using handle_unique_ptr = std::unique_ptr<HANDLE, handle_delete>;
+    using uid_t = uint32_t;
+
+    static BOOL GetUserSID(HANDLE token, PSID* sid) {
+        if (token == nullptr || token == INVALID_HANDLE_VALUE) {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return FALSE;
         }
 
-        return "/tmp";
+        DWORD tokenInformationLength = 0;
+        ::GetTokenInformation(token, TokenUser, nullptr, 0, &tokenInformationLength);
+        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) return FALSE;
+
+        heap_unique_ptr data(::HeapAlloc(::GetProcessHeap(), HEAP_ZERO_MEMORY, tokenInformationLength));
+        if (data.get() == nullptr) return FALSE;
+
+        BOOL getTokenInfo = ::GetTokenInformation(
+            token, TokenUser,
+            data.get(), tokenInformationLength,
+            &tokenInformationLength
+        );
+        if (!getTokenInfo) return FALSE;
+
+        PTOKEN_USER pTokenUser = static_cast<PTOKEN_USER>(data.get());
+        DWORD sidLength = ::GetLengthSid(pTokenUser->User.Sid);
+        heap_unique_ptr sidPtr(::HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sidLength));
+        PSID sidL = sidPtr.get();
+        if (sidL == nullptr) return FALSE;
+
+        BOOL copySid = ::CopySid(sidLength, sidL, pTokenUser->User.Sid);
+        if (!copySid) return FALSE;
+        if (!IsValidSid(sidL)) return FALSE;
+
+        *sid = sidL;
+        sidPtr.release();
+        return TRUE;
+    }
+
+    static uid_t GetUID(HANDLE token) {
+        PSID sid = nullptr;
+        BOOL getSID = GetUserSID(token, &sid);
+        if (!getSID || !sid) {
+            return -1;
+        }
+
+        heap_unique_ptr sidPtr(sid);
+        LPWSTR stringSid = nullptr;
+        BOOL convertSid = ::ConvertSidToStringSidW(sid, &stringSid);
+        if (!convertSid) {
+            return -1;
+        }
+
+        uid_t ret = -1;
+        LPCWSTR p = ::wcsrchr(stringSid, L'-');
+        if (p && ::iswdigit(p[1])) {
+            ++p;
+            ret = ::_wtoi(p);
+        }
+
+        ::LocalFree(stringSid);
+        return ret;
+    }
+
+    static uid_t getuid() {
+        HANDLE process = ::GetCurrentProcess();
+        handle_unique_ptr processPtr(process);
+        HANDLE token = nullptr;
+        BOOL openToken = ::OpenProcessToken(
+            process, TOKEN_READ | TOKEN_QUERY_SOURCE, &token
+        );
+        if (!openToken) {
+            return -1;
+        }
+        handle_unique_ptr tokenPtr(token);
+        uid_t ret = GetUID(token);
+        return ret;
+    }
+
+    static std::string getTempPath() {
+        wchar_t buffer[MAX_PATH];
+        DWORD result = ::GetEnvironmentVariableW(L"XDG_RUNTIME_DIR", buffer, MAX_PATH);
+        if (result > 0 && result < MAX_PATH) {
+            int len = WideCharToMultiByte(CP_UTF8, 0, buffer, result, nullptr, 0, nullptr, nullptr);
+            std::string path(len, '\0');
+            WideCharToMultiByte(CP_UTF8, 0, buffer, result, path.data(), len, nullptr, nullptr);
+            return path;
+        }
+
+        // try to get userid
+        auto uid = getuid();
+        if (uid != static_cast<uid_t>(-1)) {
+            return fmt::format("/run/user/{}", uid);
+        }
+
+        return "/run/user/1000"; // common default
     }
 
     static std::array<std::string, 4> const& getCandidatePaths() {
