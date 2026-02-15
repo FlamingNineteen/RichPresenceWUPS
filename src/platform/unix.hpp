@@ -25,21 +25,22 @@ namespace discord::platform {
 
     inline std::array<std::string, 4> const& getCandidatePaths() {
         static std::array<std::string, 4> paths = []() {
-            char const* base = ::getenv("XDG_RUNTIME_DIR");
+            auto base = ::getenv("XDG_RUNTIME_DIR");
+            std::string path = base ? base : "";
             if (!base) {
                 auto runUser = fmt::format("/run/user/{}", ::getuid());
                 if (::access(runUser.c_str(), F_OK) == 0) {
-                    base = runUser.c_str();
+                    path = std::move(runUser);
                 } else {
-                    base = getTempPath();
+                    path = getTempPath();
                 }
             }
 
             std::array<std::string, 4> result = {
-                base,
-                fmt::format("{}/snap.discord", base),
-                fmt::format("{}/app/com.discordapp.Discord", base),
-                fmt::format("{}/app/com.discordapp.DiscordCanary", base),
+                path,
+                fmt::format("{}/snap.discord", path),
+                fmt::format("{}/app/com.discordapp.Discord", path),
+                fmt::format("{}/app/com.discordapp.DiscordCanary", path),
             };
 
             return result;
