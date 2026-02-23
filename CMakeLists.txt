@@ -21,7 +21,7 @@ if (NOT TARGET fmt::fmt OR NOT TARGET glaze::glaze)
     CPMAddPackage("gh:fmtlib/fmt#12.1.0")
   endif()
   if (NOT TARGET glaze::glaze)
-    CPMAddPackage("gh:stephenberry/glaze@5.5.4")
+    CPMAddPackage("gh:stephenberry/glaze@7.0.2")
   endif()
 endif()
 
