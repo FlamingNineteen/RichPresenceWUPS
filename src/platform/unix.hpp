@@ -49,14 +49,13 @@ namespace discord::platform {
     }
 
     class PipeConnection {
+    public:
         PipeConnection() noexcept {
             m_address.sun_family = AF_UNIX;
         }
 
-    public:
-        static PipeConnection& get() noexcept {
-            static PipeConnection instance;
-            return instance;
+        ~PipeConnection() noexcept {
+            this->close();
         }
 
         bool open() noexcept {

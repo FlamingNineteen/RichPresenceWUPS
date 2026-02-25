@@ -34,6 +34,8 @@ namespace discord {
 
     class Connection {
     private:
+        inline static Connection* s_instance = nullptr;
+
         Connection() noexcept = default;
         ~Connection() noexcept {
             this->close();
@@ -41,8 +43,15 @@ namespace discord {
 
     public:
         static Connection& get() noexcept {
-            static Connection instance;
-            return instance;
+            if (!s_instance) {
+                s_instance = new Connection();
+            }
+            return *s_instance;
+        }
+
+        static void destroyInstance() {
+            delete s_instance;
+            s_instance = nullptr;
         }
 
         Connection(Connection const&) = delete;
@@ -98,7 +107,7 @@ namespace discord {
                 return;
             }
 
-            if (m_state == State::Disconnected && !platform::PipeConnection::get().open()) {
+            if (m_state == State::Disconnected && !m_pipe.open()) {
                 return;
             }
 
@@ -136,7 +145,7 @@ namespace discord {
                 1, appID
             );
 
-            if (platform::PipeConnection::get().write(m_frame.get(), m_frame->size())) {
+            if (m_pipe.write(m_frame.get(), m_frame->size())) {
                 m_state = State::SentHandshake;
             } else {
                 this->close();
@@ -149,7 +158,7 @@ namespace discord {
             }
 
             RPCManager::get().invokeOnDisconnected(toInt(m_lastError), m_lastErrorMessage);
-            platform::PipeConnection::get().close();
+            m_pipe.close();
             m_state = State::Disconnected;
         }
 
@@ -160,7 +169,7 @@ namespace discord {
 
             m_frame->setMessage(Opcode::Frame, buffer);
 
-            if (!platform::PipeConnection::get().write(m_frame.get(), m_frame->size())) {
+            if (!m_pipe.write(m_frame.get(), m_frame->size())) {
                 this->close();
                 return false;
             }
@@ -176,12 +185,11 @@ namespace discord {
                 return false;
             }
 
-            auto& conn = platform::PipeConnection::get();
             do {
                 // Read header
-                bool success = conn.read(m_frame.get(), MessageFrame::HeaderSize);
+                bool success = m_pipe.read(m_frame.get(), MessageFrame::HeaderSize);
                 if (!success) {
-                    if (!conn.isOpen()) {
+                    if (!m_pipe.isOpen()) {
                         m_lastError = ErrorCode::PipeClosed;
                         m_lastErrorMessage = "Pipe closed";
                         this->close();
@@ -192,7 +200,7 @@ namespace discord {
 
                 // Read data
                 if (m_frame->length > 0) {
-                    success = conn.read(m_frame->data, m_frame->length);
+                    success = m_pipe.read(m_frame->data, m_frame->length);
                     if (!success) {
                         m_lastError = ErrorCode::ReadCorrupt;
                         m_lastErrorMessage = "Partial data in frame";
@@ -225,7 +233,7 @@ namespace discord {
                     }
                     case Opcode::Ping: {
                         m_frame->opcode = Opcode::Pong;
-                        if (!conn.write(m_frame.get(), m_frame->size())) {
+                        if (!m_pipe.write(m_frame.get(), m_frame->size())) {
                             this->close();
                             return false;
                         }
@@ -246,6 +254,7 @@ namespace discord {
         [[nodiscard]] MessageFrame& getFrame() const noexcept { return *m_frame; }
 
     private:
+        platform::PipeConnection m_pipe{};
         State m_state = State::Disconnected;
         std::unique_ptr<MessageFrame> m_frame = std::make_unique<MessageFrame>();
         ErrorCode m_lastError = ErrorCode::Success;

@@ -221,11 +221,6 @@ namespace discord::platform {
         }
     }
 
-    PipeConnection& PipeConnection::get() noexcept {
-        static PipeConnection instance;
-        return instance;
-    }
-
     bool PipeConnection::open() noexcept {
         if (m_isOpen) {
             return false;

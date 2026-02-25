@@ -86,6 +86,10 @@ namespace discord {
         RPCManager::get().refresh();
     }
 
+    RPCManager::~RPCManager() noexcept {
+        shutdown();
+    }
+
     RPCManager& RPCManager::initialize() noexcept {
         if (m_initialized) {
             return *this;
@@ -115,7 +119,7 @@ namespace discord {
         this->clearPresence();
         this->update();
 
-        Connection::get().close();
+        Connection::destroyInstance();
         m_initialized = false;
 
         return *this;

@@ -33,7 +33,7 @@ namespace discord {
     private:
         // prevent construction from outside
         RPCManager() noexcept = default;
-        ~RPCManager() noexcept { shutdown(); }
+        ~RPCManager() noexcept;
 
         friend class Connection;
 
