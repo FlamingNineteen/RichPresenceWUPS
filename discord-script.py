@@ -11,6 +11,8 @@ from pypresence.types import ActivityType, StatusDisplayType
 
 APP_ID = "1353248127469228074"
 REPO = "flamingnineteen/richpresencewups-db"
+
+# Check for command line arguments
 i = 2
 while i < len(sys.argv):
     if (sys.argv[i - 1] == "repo"):
@@ -20,7 +22,6 @@ while i < len(sys.argv):
 
 # Connect to Discord
 client = Presence(client_id = APP_ID)
-
 disconnected = True
 while disconnected:
     try:
@@ -33,7 +34,6 @@ print("Connected to Discord")
 
 # Bind Socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
 binded = False
 while not binded:
     try:
@@ -53,6 +53,7 @@ try:
 except:
     print("Error fetching titles.json. Using default image.")
 
+# Parses the recieved json into a json object
 def parse(msg):
     p = msg.split('\'')[1]
     try:
@@ -61,10 +62,12 @@ def parse(msg):
         i = {}
     return i
 
+# Change the recieved time elapsed to epoch
 def toepoch(e):
     dt = datetime.now().astimezone()
     return e - int(dt.utcoffset().total_seconds())
 
+# Asynchronous function to stop Rich Presence if nothing is recieved
 idle = True
 
 async def clearPresence():
@@ -84,15 +87,18 @@ async def clearPresence():
             allow = False
         idle = True
 
+# Main loop
 async def main():
     global idle
     while 1:
+        # Wait for a message
         print("Waiting to recieve message")
         msg = await asyncio.to_thread(sock.recv, 1024)
         data = parse(str(msg))
         print(f"Recieved: {data}")
         idle = False
 
+        # Attempt to set Rich Presence
         try:
             if (data["sender"] == "Wii U"):
                 img = ""

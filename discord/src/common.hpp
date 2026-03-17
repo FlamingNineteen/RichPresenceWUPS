@@ -2,11 +2,12 @@
 #include <fmt/format.h>
 
 constexpr auto APPLICATION_ID = "1353248127469228074";
-constexpr int UDP_PORT = 5005;
+constexpr unsigned short UDP_PORT = 5005;
 std::atomic<bool> idle = false;
 std::atomic<bool> runIdleLoop = true;
 
-static void discordSetup() {
+// Setup the Rich Presence manager and its events
+void discordSetup() {
     discord::RPCManager::get()
         .setClientID(APPLICATION_ID)
         .onReady([](discord::User const& user) {
@@ -20,7 +21,8 @@ static void discordSetup() {
         });
 }
 
-static void updatePresence(std::string repo, std::string game, std::string full, std::string nnid, int ctrls, std::string jpg, std::string img, time_t start) {
+// Sets the Rich Presence
+void updatePresence(std::string repo, std::string game, std::string full, std::string nnid, int ctrls, std::string jpg, std::string img, time_t start) {
     idle = false;
     auto& rpc = discord::RPCManager::get();
     int maxParty = (ctrls + 1 > 4) ? 8 : 4;
@@ -44,6 +46,7 @@ static void updatePresence(std::string repo, std::string game, std::string full,
     fmt::println("Updated Rich Presence");
 }
 
+// Asynchronous function to stop Rich Presence if nothing is recieved
 void checkIdle() {
 	bool allow = false;
     auto& rpc = discord::RPCManager::get();

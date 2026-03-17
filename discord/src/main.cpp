@@ -10,15 +10,16 @@ std::string repo = "flamingnineteen/richpresencewups-db";
 std::thread tthread(checkIdle);
 
 int main(int argc, char* argv[]) {
+    // Check for command line arguments
     int i = 2;
     while (i < argc) {
-        // More commands can be added here in the future
         if (std::strcmp(argv[i - 1], "repo") == 0) {
             repo = argv[i];
             fmt::println("Using repository {}.", repo);
         }
         i++;
     }
+
     discordSetup();
     discord::RPCManager::get().initialize();
 

@@ -111,7 +111,7 @@ int ctrlNum(DisplayOptions display) {
 }
 
 // Gets a tag from the application's xml
-std::string GetXmlTag(std::string tag) {
+std::string getXmlTag(std::string tag) {
     std::string result;
     ACPInitialize();
     auto *metaXml = (ACPMetaXml *) memalign(0x40, sizeof(ACPMetaXml));
@@ -134,7 +134,7 @@ std::string GetXmlTag(std::string tag) {
 }
 
 // Removes any instances of \n from a string
-std::string RemoveSlashN(std::string s) {
+std::string removeSlashN(std::string s) {
     while (true) {
         size_t finder = s.find("\n");
         if (finder == std::string::npos) break;
@@ -143,32 +143,8 @@ std::string RemoveSlashN(std::string s) {
     return s;
 }
 
-std::vector<std::string> ListDirs(const char* path) {
-    std::vector<std::string> dirs;
-    DIR* dir = opendir(path);
-    if (!dir) {
-        return dirs;
-    }
-
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != NULL) {
-        // Skip "." and ".."
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-            continue;
-
-        // Build full path
-        std::string fullPath = std::string(path) + "/" + entry->d_name;
-        struct stat st;
-        if (stat(fullPath.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
-            dirs.push_back(entry->d_name);
-        }
-    }
-    closedir(dir);
-    return dirs;
-}
-
 // Broadcast over port 5005
-void Broadcast(const std::string& json) {
+void broadcast(const std::string& json) {
     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock < 0) return;
 
@@ -185,7 +161,7 @@ void Broadcast(const std::string& json) {
 }
 
 // Gets the network id of the current account.
-std::string GetNnid() {
+std::string getNnid() {
     if (configNetId) {
         char account_id[256];
         nn::act::GetAccountId(account_id);
@@ -202,7 +178,7 @@ std::string GetNnid() {
  * `pn` for Pretendo,
  * nothing for neither
  */
-std::string GetNetwork() {
+std::string getNetwork() {
     if (configSmallImg) {
         if (INKAY_EXISTS) {
             std::ifstream acc(INKAY_CONFIG);
@@ -233,13 +209,13 @@ std::string GetNetwork() {
 }
 
 // Main background loop to broadcast current info
-void GameLoop(std::stop_token stoken) {
+void gameLoop(std::stop_token stoken) {
     while (!stoken.stop_requested()) {
         if (app != "") {
             int ctrls = ctrlNum(configCtrl);
-            nnid = GetNnid();
-            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + RemoveSlashN(GetXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + GetNetwork() + "\"}";
-            Broadcast(json);
+            nnid = getNnid();
+            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + removeSlashN(getXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + getNetwork() + "\"}";
+            broadcast(json);
         }
 
         // Five second interval
@@ -358,7 +334,7 @@ INITIALIZE_PLUGIN() {
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_SMALL_IMG_CONFIG_ID, configSmallImg, CONFIG_SMALL_IMG_DEFAULT_VALUE);
     WUPSStorageAPI::SaveStorage();
 
-    if (static_cast<int>(configCtrl) > 2) nnid = GetNnid();
+    if (static_cast<int>(configCtrl) > 2) nnid = getNnid();
 
     char environment_path_buffer[0x100];
     Mocha_GetEnvironmentPath(environment_path_buffer, sizeof(environment_path_buffer));
@@ -367,7 +343,7 @@ INITIALIZE_PLUGIN() {
 }
 
 ON_APPLICATION_START() {
-    app = GetXmlTag("shortname_en");
+    app = getXmlTag("shortname_en");
     if (app == "Health and Safety Information") app = "Homebrew Application";
     if (app != preapp) elapsed = time(NULL); // Only update elapsed time if app changed
     preapp = app;
@@ -375,7 +351,7 @@ ON_APPLICATION_START() {
         tthread.request_stop();
         tthread.join(); // Wait for thread to finish before starting a new one
     }
-    tthread = std::jthread(GameLoop);
+    tthread = std::jthread(gameLoop);
 }
 
 ON_APPLICATION_REQUESTS_EXIT() {

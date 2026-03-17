@@ -26,17 +26,19 @@ using json = nlohmann::json;
 	#include <mach-o/dyld.h>
 #endif
 
+// Change the recieved time elapsed to epoch
 time_t adjustEpochToUtc(time_t localEpoch) {
 	long timezone_offset = timezone;
 	return localEpoch + timezone_offset;
 }
 
-size_t writeCallback(void* contents, size_t size, size_t nmemb, void* userp)
-{
+// CURL callback
+size_t writeCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     ((std::string*)userp)->append((char*)contents, size *nmemb);
     return size *nmemb;
 }
 
+// Fetches data with html
 std::string fetchRawHtml(std::string server, std::string path) {
 	CURL* curl = curl_easy_init();
 	if (!curl) return "CURL init failed";
@@ -59,6 +61,7 @@ std::string fetchRawHtml(std::string server, std::string path) {
 	return content;
 }
 
+// Fetch the image keys from the repository
 json getImageKeys(std::string repo) {
     json images;
 
@@ -73,7 +76,8 @@ json getImageKeys(std::string repo) {
     return images;
 }
 
-static void gameLoop(std::string repo) {
+// Main loop
+void gameLoop(std::string repo) {
 	std::string msg;
 
 	boost::asio::io_context io_context;
@@ -105,9 +109,11 @@ static void gameLoop(std::string repo) {
     char buffer[1024];
 
     do {
+		// Wait for a message
 		size_t length = socket.receive_from(boost::asio::buffer(data), sender_endpoint);
 		msg = std::string(data, length);
 
+		// Attempt to set Rich Presence
         try {
             out = json::parse(msg);
             if (out["sender"] == "Wii U") {

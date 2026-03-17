@@ -14,6 +14,7 @@ if (WIN32)
   target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32.lib)
 endif()
 
+# Dependencies of the Rich Presence library
 if (NOT TARGET fmt::fmt)
   CPMAddPackage("gh:fmtlib/fmt#11.2.0")
 endif()

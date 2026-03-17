@@ -14,23 +14,32 @@
 #include "json.hpp"
 using json = nlohmann::json;
 
-time_t adjustEpochToUtc(time_t localEpoch) {
+// Change the recieved time elapsed to epoch
+time_t adjustEpochToUtc(time_t localEpoch, bool dst = false) {
     TIME_ZONE_INFORMATION tzInfo;
     DWORD result = GetTimeZoneInformation(&tzInfo);
 
-    // Use only the standard time bias, ignoring daylight saving time
-    int bias = tzInfo.Bias;
+    // Get either standard time bias or daylight savings time bias
+    int bias = 0;
+    if (dst) {
+        bias = tzInfo.DaylightBias;
+    }
+    else {
+        bias = tzInfo.Bias;
+    }
 
     // Convert bias from minutes to seconds and adjust the Epoch time
     time_t utcEpoch = localEpoch + (bias * 60);
     return utcEpoch;
 }
 
+// Converts a string to a wide string
 std::wstring toWstring(const std::string s) {
 	std::wstring ws(s.begin(), s.end());
 	return ws;
 }
 
+// Fetches data with html
 std::string fetchRawHtml(std::string server, std::string path) {
     std::wstring wserver = toWstring(server);
     std::wstring wpath = toWstring(path);
@@ -72,6 +81,7 @@ std::string fetchRawHtml(std::string server, std::string path) {
     return content;
 }
 
+// Fetch the image keys from the repository
 json getImageKeys(std::string repo) {
     json images;
 
@@ -86,7 +96,8 @@ json getImageKeys(std::string repo) {
     return images;
 }
 
-bool bind(SOCKET &sock) {
+// Bind to a UDP socket
+bool bind(SOCKET &sock, unsigned short port = UDP_PORT) {
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         return false;
@@ -103,7 +114,7 @@ bool bind(SOCKET &sock) {
     // Bind to all interfaces on the specified port
     sockaddr_in addr {};
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(UDP_PORT);
+    addr.sin_port = htons(port);
     addr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(sock, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
@@ -116,9 +127,10 @@ bool bind(SOCKET &sock) {
     return true;
 }
 
-static void gameLoop(std::string repo) {
+// Main loop
+void gameLoop(std::string repo) {
+    // Bind the socket
 	std::string msg;
-
     SOCKET sock;
     while(!bind(sock)) {
         fmt::println("Retrying...");
@@ -134,6 +146,7 @@ static void gameLoop(std::string repo) {
     char buffer[1024];
 
     do {
+        // Wait for a message
         sockaddr_in sender {};
         int senderLen = sizeof(sender);
         int len = recvfrom(sock, buffer, sizeof(buffer) - 1, 0,
@@ -145,6 +158,7 @@ static void gameLoop(std::string repo) {
         buffer[len] = '\0'; // Null-terminate
         std::string msg = buffer;
 
+        // Attempt to set Rich Presence
         try {
             out = json::parse(msg);
             if (out["sender"] == "Wii U") {
