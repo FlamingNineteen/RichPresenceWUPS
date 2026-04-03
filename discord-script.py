@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import asyncio
 import json
 import requests
@@ -55,9 +56,8 @@ except:
 
 # Parses the recieved json into a json object
 def parse(msg):
-    p = msg.split('\'')[1]
     try:
-        i = json.loads(p)
+        i = json.loads(msg)
     except:
         i = {}
     return i
@@ -94,7 +94,7 @@ async def main():
         # Wait for a message
         print("Waiting to recieve message")
         msg = await asyncio.to_thread(sock.recv, 1024)
-        data = parse(str(msg))
+        data = parse(msg.decode())
         print(f"Recieved: {data}")
         idle = False
 
