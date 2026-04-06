@@ -73,6 +73,7 @@ enum DisplayOptions {
 #define CONFIG_CTRL_DEFAULT_VALUE CTRLCOUNT
 #define CONFIG_DST_DEFAULT_VALUE true
 #define CONFIG_PORT_DEFAULT_VALUE 5005
+#define CONFIG_COD_DEFAULT_VALUE true
 
 // Set config IDs for config options
 #define CONFIG_ENABLED_CONFIG_ID "enabled"
@@ -82,6 +83,7 @@ enum DisplayOptions {
 #define CONFIG_SMALL_IMG_CONFIG_ID "smallimg"
 #define CONFIG_DST_CONFIG_ID "dst"
 #define CONFIG_PORT_CONFIG_ID "port"
+#define CONFIG_COD_CONFIG_ID "cod"
 
 // Create a variable for each config option
 bool configEnabled        = CONFIG_ENABLED_DEFAULT_VALUE;
@@ -91,6 +93,7 @@ DisplayOptions configCtrl = CONFIG_CTRL_DEFAULT_VALUE;
 bool configSmallImg       = CONFIG_SMALL_IMG_DEFAULT_VALUE;
 bool configDst            = CONFIG_DST_DEFAULT_VALUE;
 int configPort            = CONFIG_PORT_DEFAULT_VALUE;
+bool configCod            = CONFIG_COD_CONFIG_ID;
 
 // Create miscellanious variables
 std::jthread tthread;
@@ -245,41 +248,39 @@ void gameLoop(std::stop_token stoken) {
 void boolItemChanged(ConfigItemBoolean *item, bool newValue) {
     if (std::string_view(CONFIG_ENABLED_CONFIG_ID) == item->identifier) {
         configEnabled = newValue;
-        // If the value has changed, we store it in the storage.
-        WUPSStorageAPI::Store(item->identifier, newValue);
     }
     
     if (std::string_view(CONFIG_NET_ID_CONFIG_ID) == item->identifier) {
         configNetId = newValue;
-        // If the value has changed, we store it in the storage.
-        WUPSStorageAPI::Store(item->identifier, newValue);
     }
 
     if (std::string_view(CONFIG_SMALL_IMG_CONFIG_ID) == item->identifier) {
         configSmallImg = newValue;
-        // If the value has changed, we store it in the storage.
-        WUPSStorageAPI::Store(item->identifier, newValue);
     }
 
     if (std::string_view(CONFIG_DST_CONFIG_ID) == item->identifier) {
         configDst = newValue;
-        // If the value has changed, we store it in the storage.
-        WUPSStorageAPI::Store(item->identifier, newValue);
     }
+
+    if (std::string_view(CONFIG_COD_CONFIG_ID) == item->identifier) {
+        configCod = newValue;
+    }
+
+    // If the value has changed, we store it in the storage.
+    WUPSStorageAPI::Store(item->identifier, newValue);
 }
 
 void integerRangeItemChanged(ConfigItemIntegerRange *item, int newValue) {
     if (std::string_view(CONFIG_TIMESET_CONFIG_ID) == item->identifier) {
         configTimeset = newValue;
-        // If the value has changed, we store it in the storage.
-        WUPSStorageAPI::Store(item->identifier, newValue);
     }
 
     if (std::string_view(CONFIG_PORT_CONFIG_ID) == item->identifier) {
         configPort = newValue;
-        // If the value has changed, we store it in the storage.
-        WUPSStorageAPI::Store(item->identifier, newValue);
     }
+
+    // If the value has changed, we store it in the storage.
+    WUPSStorageAPI::Store(item->identifier, newValue);
 }
 
 void multipleValueItemChanged(ConfigItemMultipleValues *item, u_int32_t newValue) {
@@ -347,10 +348,15 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
                                                     boolItemChanged));
 
         // Port integer range
-        configCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_PORT_CONFIG_ID, "UDP port (5005 recommended)",
+        configCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_PORT_CONFIG_ID, "UDP port (default 5005)",
                                                          CONFIG_PORT_DEFAULT_VALUE, configPort,
                                                          0, 65535,
                                                          &integerRangeItemChanged));
+
+        // Call of Duty patch boolean
+        configCat.add(WUPSConfigItemBoolean::Create(CONFIG_COD_CONFIG_ID, "Enable Call of Duty patches",
+                                                    CONFIG_COD_DEFAULT_VALUE, configCod,
+                                                    boolItemChanged));
         
         root.add(std::move(configCat));
 
@@ -382,6 +388,7 @@ INITIALIZE_PLUGIN() {
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_SMALL_IMG_CONFIG_ID, configSmallImg, CONFIG_SMALL_IMG_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_DST_CONFIG_ID, configDst, CONFIG_DST_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_PORT_CONFIG_ID, configPort, CONFIG_PORT_DEFAULT_VALUE);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_COD_CONFIG_ID, configCod, CONFIG_COD_DEFAULT_VALUE);
     WUPSStorageAPI::SaveStorage();
 
     if (static_cast<int>(configCtrl) > 2) nnid = getNnid();
@@ -401,7 +408,7 @@ ON_APPLICATION_START() {
         tthread.request_stop();
         tthread.join(); // Wait for thread to finish before starting a new one
     }
-    if (configEnabled) tthread = std::jthread(gameLoop);
+    if (configEnabled && !(configCod && app.find("Call of Duty") != std::string::npos)) tthread = std::jthread(gameLoop);
 }
 
 ON_APPLICATION_REQUESTS_EXIT() {    
