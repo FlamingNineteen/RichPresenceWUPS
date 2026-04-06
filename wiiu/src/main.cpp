@@ -65,21 +65,34 @@ enum DisplayOptions {
     NODISPLAY = 0, CTRLCOUNTNODRC = 1, CTRLCOUNT = 2
 };
 
+// Set default values for config options
+#define CONFIG_ENABLED_DEFAULT_VALUE true
 #define CONFIG_NET_ID_DEFAULT_VALUE true
 #define CONFIG_SMALL_IMG_DEFAULT_VALUE true
 #define CONFIG_TIMESET_DEFAULT_VALUE 0
 #define CONFIG_CTRL_DEFAULT_VALUE CTRLCOUNT
+#define CONFIG_DST_DEFAULT_VALUE true
+#define CONFIG_PORT_DEFAULT_VALUE 5005
 
-#define CONFIG_NET_ID_CONFIG_ID "enabled"
+// Set config IDs for config options
+#define CONFIG_ENABLED_CONFIG_ID "enabled"
+#define CONFIG_NET_ID_CONFIG_ID "netid"
 #define CONFIG_TIMESET_CONFIG_ID "timeset"
 #define CONFIG_CTRL_CONFIG_ID "display"
 #define CONFIG_SMALL_IMG_CONFIG_ID "smallimg"
+#define CONFIG_DST_CONFIG_ID "dst"
+#define CONFIG_PORT_CONFIG_ID "port"
 
+// Create a variable for each config option
+bool configEnabled        = CONFIG_ENABLED_DEFAULT_VALUE;
 bool configNetId          = CONFIG_NET_ID_DEFAULT_VALUE;
 int configTimeset         = CONFIG_TIMESET_DEFAULT_VALUE;
 DisplayOptions configCtrl = CONFIG_CTRL_DEFAULT_VALUE;
 bool configSmallImg       = CONFIG_SMALL_IMG_DEFAULT_VALUE;
+bool configDst            = CONFIG_DST_DEFAULT_VALUE;
+int configPort            = CONFIG_PORT_DEFAULT_VALUE;
 
+// Create miscellanious variables
 std::jthread tthread;
 std::string nnid;
 bool INKAY_EXISTS;
@@ -153,7 +166,7 @@ void broadcast(const std::string& json) {
 
     sockaddr_in dest {};
     dest.sin_family = AF_INET;
-    dest.sin_port = htons(5005);
+    dest.sin_port = htons(configPort);
     dest.sin_addr.s_addr = inet_addr("255.255.255.255");
 
     sendto(sock, json.c_str(), json.size(), 0, reinterpret_cast<sockaddr*>(&dest), sizeof(dest));
@@ -210,16 +223,16 @@ std::string getNetwork() {
 
 // Main background loop to broadcast current info
 void gameLoop(std::stop_token stoken) {
-    while (!stoken.stop_requested()) {
+    while (!stoken.stop_requested() && configEnabled) {
         if (app != "") {
             int ctrls = ctrlNum(configCtrl);
             nnid = getNnid();
-            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + removeSlashN(getXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + getNetwork() + "\"}";
+            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + removeSlashN(getXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + getNetwork() + "\",\"dst\":" + std::to_string(configDst) + "}";
             broadcast(json);
         }
 
         // Five second interval
-        for (int i=0; i<1000 && !stoken.stop_requested(); i++) {
+        for (int i=0; i<1000 && !stoken.stop_requested() && configEnabled; i++) {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
     }
@@ -230,6 +243,12 @@ void gameLoop(std::stop_token stoken) {
  * Callbacks that will be called if the config has been changed
  */
 void boolItemChanged(ConfigItemBoolean *item, bool newValue) {
+    if (std::string_view(CONFIG_ENABLED_CONFIG_ID) == item->identifier) {
+        configEnabled = newValue;
+        // If the value has changed, we store it in the storage.
+        WUPSStorageAPI::Store(item->identifier, newValue);
+    }
+    
     if (std::string_view(CONFIG_NET_ID_CONFIG_ID) == item->identifier) {
         configNetId = newValue;
         // If the value has changed, we store it in the storage.
@@ -241,11 +260,23 @@ void boolItemChanged(ConfigItemBoolean *item, bool newValue) {
         // If the value has changed, we store it in the storage.
         WUPSStorageAPI::Store(item->identifier, newValue);
     }
+
+    if (std::string_view(CONFIG_DST_CONFIG_ID) == item->identifier) {
+        configDst = newValue;
+        // If the value has changed, we store it in the storage.
+        WUPSStorageAPI::Store(item->identifier, newValue);
+    }
 }
 
 void integerRangeItemChanged(ConfigItemIntegerRange *item, int newValue) {
     if (std::string_view(CONFIG_TIMESET_CONFIG_ID) == item->identifier) {
         configTimeset = newValue;
+        // If the value has changed, we store it in the storage.
+        WUPSStorageAPI::Store(item->identifier, newValue);
+    }
+
+    if (std::string_view(CONFIG_PORT_CONFIG_ID) == item->identifier) {
+        configPort = newValue;
         // If the value has changed, we store it in the storage.
         WUPSStorageAPI::Store(item->identifier, newValue);
     }
@@ -275,6 +306,11 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         
         // Settings category
         auto configCat = WUPSConfigCategory::Create("Plugin settings");
+
+        // Enable boolean
+        configCat.add(WUPSConfigItemBoolean::Create(CONFIG_ENABLED_CONFIG_ID, "Enable rich presence updates",
+                                                    CONFIG_ENABLED_DEFAULT_VALUE, configEnabled,
+                                                    boolItemChanged));
         
         // Display options
         constexpr WUPSConfigItemMultipleValues::ValuePair displayOptValues[] = {
@@ -305,6 +341,17 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
                                                          -12, 12,
                                                          &integerRangeItemChanged));
         
+        // Daylight savings time boolean
+        configCat.add(WUPSConfigItemBoolean::Create(CONFIG_DST_CONFIG_ID, "Conform to Daylight Savings Time",
+                                                    CONFIG_DST_DEFAULT_VALUE, configDst,
+                                                    boolItemChanged));
+
+        // Port integer range
+        configCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_PORT_CONFIG_ID, "UDP port (5005 recommended)",
+                                                         CONFIG_PORT_DEFAULT_VALUE, configPort,
+                                                         0, 65535,
+                                                         &integerRangeItemChanged));
+        
         root.add(std::move(configCat));
 
         // Contribute category
@@ -328,10 +375,13 @@ INITIALIZE_PLUGIN() {
 
     WUPSConfigAPIOptionsV1 configOptions = {.name = "Rich Presence"};
     WUPSConfigAPI_Init(configOptions, ConfigMenuOpenedCallback, ConfigMenuClosedCallback);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_ENABLED_CONFIG_ID, configEnabled, CONFIG_ENABLED_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_NET_ID_CONFIG_ID, configNetId, CONFIG_NET_ID_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_TIMESET_CONFIG_ID, configTimeset, CONFIG_TIMESET_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_CTRL_CONFIG_ID, configCtrl, CONFIG_CTRL_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_SMALL_IMG_CONFIG_ID, configSmallImg, CONFIG_SMALL_IMG_DEFAULT_VALUE);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_DST_CONFIG_ID, configDst, CONFIG_DST_DEFAULT_VALUE);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_PORT_CONFIG_ID, configPort, CONFIG_PORT_DEFAULT_VALUE);
     WUPSStorageAPI::SaveStorage();
 
     if (static_cast<int>(configCtrl) > 2) nnid = getNnid();
@@ -351,10 +401,10 @@ ON_APPLICATION_START() {
         tthread.request_stop();
         tthread.join(); // Wait for thread to finish before starting a new one
     }
-    tthread = std::jthread(gameLoop);
+    if (configEnabled) tthread = std::jthread(gameLoop);
 }
 
-ON_APPLICATION_REQUESTS_EXIT() {
+ON_APPLICATION_REQUESTS_EXIT() {    
     if (tthread.joinable()) {
         tthread.request_stop();
         tthread.join(); // Wait for thread to finish

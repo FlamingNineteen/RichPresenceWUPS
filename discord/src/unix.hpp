@@ -27,9 +27,15 @@ using json = nlohmann::json;
 #endif
 
 // Change the recieved time elapsed to epoch
-time_t adjustEpochToUtc(time_t localEpoch) {
-	long timezone_offset = timezone;
-	return localEpoch + timezone_offset;
+time_t adjustEpochToUtc(time_t localEpoch, bool dst = false) {
+	if (dst) {
+		struct tm tm;
+		localtime_r(&localEpoch, &tm);
+		return localEpoch - tm.tm_gmtoff;
+	} else {
+		long timezone_offset = timezone;
+		return localEpoch + timezone_offset;
+	}
 }
 
 // CURL callback
