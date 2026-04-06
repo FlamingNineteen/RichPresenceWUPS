@@ -17,7 +17,11 @@ int main(int argc, char* argv[]) {
             repo = argv[i];
             fmt::println("Using repository {}.", repo);
         }
-        i++;
+        else if (std::strcmp(argv[i - 1], "port") == 0) {
+            UDP_PORT = std::stoi(argv[i]);
+            fmt::println("Using port {}.", UDP_PORT);
+        }
+        i+=2;
     }
 
     discordSetup();

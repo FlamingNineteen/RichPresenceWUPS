@@ -2,7 +2,7 @@
 #include <fmt/format.h>
 
 constexpr auto APPLICATION_ID = "1353248127469228074";
-constexpr unsigned short UDP_PORT = 5005;
+unsigned short UDP_PORT = 5005;
 std::atomic<bool> idle = false;
 std::atomic<bool> runIdleLoop = true;
 

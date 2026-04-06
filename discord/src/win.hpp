@@ -22,7 +22,7 @@ time_t adjustEpochToUtc(time_t localEpoch, bool dst = false) {
     // Get either standard time bias or daylight savings time bias
     int bias = 0;
     if (dst) {
-        bias = tzInfo.DaylightBias;
+        bias = tzInfo.Bias - 60;
     }
     else {
         bias = tzInfo.Bias;
@@ -136,7 +136,7 @@ void gameLoop(std::string repo) {
         fmt::println("Retrying...");
         std::this_thread::sleep_for(std::chrono::seconds(2));
     };
-    fmt::println("Successfully binded to UDP port 5005");
+    fmt::println("Successfully binded to port");
 
     auto& rpc = discord::RPCManager::get();
 
@@ -174,7 +174,10 @@ void gameLoop(std::string repo) {
                 image = "oh no it didn't work";
             }
 
-            if (out.contains("img")) { // Update 2.0
+            if (out.contains("dst")) { // Update 2.1
+                updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"], out["dst"] == 1));
+            }
+            else if (out.contains("img")) { // Update 2.0
                 updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"]));
             }
             else { // Update 1.9
