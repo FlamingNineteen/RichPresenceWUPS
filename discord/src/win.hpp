@@ -44,7 +44,7 @@ std::string fetchRawHtml(std::string server, std::string path) {
     std::wstring wserver = toWstring(server);
     std::wstring wpath = toWstring(path);
 
-    HINTERNET hSession = WinHttpOpen(L"WURP", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, NULL, NULL, 0);
+    HINTERNET hSession = WinHttpOpen(L"WiiURichPresence/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, NULL, NULL, 0);
     if (!hSession) return "";
     
     HINTERNET hConnect = WinHttpConnect(hSession, wserver.c_str(), INTERNET_DEFAULT_HTTPS_PORT, 0);
@@ -79,6 +79,54 @@ std::string fetchRawHtml(std::string server, std::string path) {
     WinHttpCloseHandle(hSession);
 
     return content;
+}
+
+int getStatusCode(std::string server, std::string path) {
+    std::wstring wserver = toWstring(server);
+    std::wstring wpath = toWstring(path);
+    
+    HINTERNET hSession = WinHttpOpen(L"WiiURichPresence/1.0",
+                                     WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                     NULL, NULL, 0);
+    if (!hSession) return -1;
+    
+    HINTERNET hConnect = WinHttpConnect(hSession, wserver.c_str(),
+                                       INTERNET_DEFAULT_HTTPS_PORT, 0);
+    if (!hConnect) return -1;
+
+    HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", wpath.c_str(),
+                                            NULL, WINHTTP_NO_REFERER,
+                                            WINHTTP_DEFAULT_ACCEPT_TYPES,
+                                            WINHTTP_FLAG_SECURE);
+    if (!hRequest) return -1;
+
+    DWORD dwStatusCode = 0;
+
+    if (WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+                           WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+        WinHttpReceiveResponse(hRequest, NULL))
+    {
+        DWORD dwSize = 0;
+        WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE,
+                            WINHTTP_HEADER_NAME_BY_INDEX, NULL, &dwSize,
+                            WINHTTP_NO_HEADER_INDEX);
+
+        std::wstring status(dwSize / sizeof(wchar_t), L'\0');
+
+        if (WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE,
+                                WINHTTP_HEADER_NAME_BY_INDEX,
+                                &status[0], &dwSize,
+                                WINHTTP_NO_HEADER_INDEX))
+        {
+            dwStatusCode = std::stoi(status);
+        }
+    }
+
+    WinHttpCloseHandle(hRequest);
+    WinHttpCloseHandle(hConnect);
+    WinHttpCloseHandle(hSession);
+
+    return dwStatusCode;
 }
 
 // Fetch the image keys from the repository

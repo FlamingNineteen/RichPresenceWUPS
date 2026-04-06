@@ -55,7 +55,7 @@ std::string fetchRawHtml(std::string server, std::string path) {
 	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &content);
-	curl_easy_setopt(curl, CURLOPT_USERAGENT, "DiscordWiiU/1.0");
+	curl_easy_setopt(curl, CURLOPT_USERAGENT, "WiiURichPresence/1.0");
 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
 	CURLcode res = curl_easy_perform(curl);
@@ -65,6 +65,25 @@ std::string fetchRawHtml(std::string server, std::string path) {
 		return std::string("CURL error: ") + curl_easy_strerror(res);
 	}
 	return content;
+}
+
+std::string getStatusCode(std::string server, std::string path) {
+	CURL* curl = curl_easy_init();
+	if (!curl) return "CURL init failed";
+
+	unsigned short code = 0;
+	std::string url = "https://" + server + path;
+
+	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
+	curl_easy_setopt(curl, CURLOPT_USERAGENT, "WiiURichPresence/1.0");
+	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+	CURLcode res = curl_easy_perform(curl);
+	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
+	curl_easy_cleanup(curl);
+
+	return code;
 }
 
 // Fetch the image keys from the repository
