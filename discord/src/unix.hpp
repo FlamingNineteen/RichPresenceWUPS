@@ -101,11 +101,11 @@ void gameLoop(std::string repo) {
 			binded = true;
 		}
 		catch (...) {
-			fmt::println("Failed to bind to UDP port 5005. Is another program using the port? Retrying...");
+			fmt::println("Failed to bind to UDP port. Is another program using it? Retrying...");
 			std::this_thread::sleep_for(std::chrono::seconds(2));
 		}
 	}
-	fmt::println("Successfully binded to UDP port 5005");
+	fmt::println("Successfully binded to UDP port");
 
     auto& rpc = discord::RPCManager::get();
 
@@ -135,7 +135,10 @@ void gameLoop(std::string repo) {
                 image = "oh no it didn't work";
             }
 
-            if (out.contains("img")) { // Update 2.0
+            if (out.contains("dst")) { // Update 2.1
+                updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"], out["dst"] == 1));
+            }
+            else if (out.contains("img")) { // Update 2.0
                 updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"]));
             }
             else { // Update 1.9

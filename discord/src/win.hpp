@@ -118,7 +118,7 @@ bool bind(SOCKET &sock, unsigned short port = UDP_PORT) {
     addr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(sock, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
-        fmt::println("Bind failed.");
+        fmt::println("Failed to bind to UDP port. Is another program using it? Retrying...");
         closesocket(sock);
         WSACleanup();
         return false;
@@ -133,7 +133,6 @@ void gameLoop(std::string repo) {
 	std::string msg;
     SOCKET sock;
     while(!bind(sock)) {
-        fmt::println("Retrying...");
         std::this_thread::sleep_for(std::chrono::seconds(2));
     };
     fmt::println("Successfully binded to port");
