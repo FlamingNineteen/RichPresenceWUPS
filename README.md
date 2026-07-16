@@ -18,14 +18,17 @@ This plugin uses UDP to communicate with an application on your computer to set 
 **If not using a systemd-based system, refer to the Windows/MacOS instructions instead.**
 
 1. Clone this repository using git.  
-`git clone https://github.com/cmyksoda/RichPresenceWUPS.git`
-2. Download both `RichPresence.wps` and the `WURP-Linux` binary from the releases page.
-3. Place the `WURP-Linux` binary into the same directory as this repository.  
-4. Run the installation script (this installs WUPS as a systemd user process)
-``bash
-./install.sh``
-5. Copy `RichPresence.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
-6. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
+```bash
+git clone https://github.com/cmyksoda/RichPresenceWUPS.git
+```
+3. Download both `RichPresence.wps` and the `WURP-Linux` binary from the releases page.
+4. Place the `WURP-Linux` binary into the same directory as this repository.  
+5. Run the installation script (this installs WUPS as a systemd user process)  
+```bash
+./install.sh
+```
+6. Copy `RichPresence.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
+7. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
 
 ## Usage
 Start your Wii U with the environment you placed the plugin in, and run the executable file with the Discord app open.
