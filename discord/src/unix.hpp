@@ -1,21 +1,10 @@
 #include "common.hpp"
 #include <iostream>
 
-#include <boost/asio.hpp>
-#include <boost/beast/core.hpp>
-#include <boost/beast/http.hpp>
-#include <boost/beast/ssl.hpp>
-#include <boost/asio/connect.hpp>
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/ssl/error.hpp>
-#include <boost/asio/ssl/stream.hpp>
 #include <curl/curl.h>
-namespace beast = boost::beast;
-namespace http = beast::http;
-namespace net = boost::asio;
-namespace ssl = net::ssl;
-using tcp = net::ip::tcp;
-using boost::asio::ip::udp;
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <unistd.h>
 
 #include "json.hpp"
 using json = nlohmann::json;
@@ -112,26 +101,26 @@ json getImageKeys(std::string repo) {
 // Main loop
 void gameLoop(std::string repo) {
 	std::string msg;
-
-	boost::asio::io_context io_context;
+	int sock;
+	struct sockaddr_in addr;
 
 	// Create UDP socket
-	// Bind to all interfaces on the specified port
-	udp::socket socket = udp::socket(io_context);
-	udp::endpoint sender_endpoint;
-	char data[1024];
+	do {	
+		sock = socket(AF_INET, SOCK_DGRAM, 0);
+	} while (sock < 0);
 
-	bool binded = false;
-	while (!binded) {
-		try {
-			socket = udp::socket(io_context, udp::endpoint(udp::v4(), UDP_PORT));
-			binded = true;
-		}
-		catch (...) {
-			fmt::println("Failed to bind to UDP port. Is another program using it? Retrying...");
-			std::this_thread::sleep_for(std::chrono::seconds(2));
-		}
-	}
+	// Bind to all interfaces on the specified port
+	memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces
+    addr.sin_port = htons(5005);      // Bind to port 5005
+
+	while (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        perror("bind failed");
+		fmt::println("Failed to bind to UDP port. Is another program using it? Retrying...");
+		std::this_thread::sleep_for(std::chrono::seconds(2));
+    }
+
 	fmt::println("Successfully binded to UDP port");
 
     auto& rpc = discord::RPCManager::get();
@@ -143,37 +132,47 @@ void gameLoop(std::string repo) {
 
     do {
 		// Wait for a message
-		size_t length = socket.receive_from(boost::asio::buffer(data), sender_endpoint);
-		msg = std::string(data, length);
+		socklen_t addr_len = sizeof(addr);
+    	ssize_t bytes_received = recvfrom(sock, buffer, sizeof(buffer), 0, (struct sockaddr *)&addr, &addr_len);
+    
+		if (bytes_received > 0) {
+			buffer[bytes_received] = '\0';
+			msg = buffer;
+			
+			// Attempt to set Rich Presence
+			try {
+				out = json::parse(msg);
+				if (out["sender"] == "Wii U") {
+					
+					fmt::println("Received: {}", msg);
 
-		// Attempt to set Rich Presence
-        try {
-            out = json::parse(msg);
-            if (out["sender"] == "Wii U") {
-                
-                fmt::println("Received: {}", msg);
+					idle = false;
+				}
 
-                idle = false;
-            }
+				try {
+					image = images[out["long"]];
+				} catch (...) {
+					image = "oh no it didn't work";
+				}
 
-            try {
-                image = images[out["long"]];
-            } catch (...) {
-                image = "oh no it didn't work";
-            }
-
-            if (out.contains("dst")) { // Update 2.1
-                updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"], out["dst"] == 1));
-            }
-            else if (out.contains("img")) { // Update 2.0
-                updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"]));
-            }
-            else { // Update 1.9
-                updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, "backwards", adjustEpochToUtc(out["time"]));
-            }
-        }
-        catch (...) {}
+				if (out.contains("dst")) { // Update 2.1
+					updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"], out["dst"] == 1));
+				}
+				else if (out.contains("img")) { // Update 2.0
+					updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"]));
+				}
+				else { // Update 1.9
+					updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, "backwards", adjustEpochToUtc(out["time"]));
+				}
+			}
+			catch (...) {}
+		}
+		else {
+			fmt::println("Recieved empty message");
+		}
     } while (true);
+
+	close(sock);
 
     return;
 }

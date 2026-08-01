@@ -49,20 +49,22 @@ void updatePresence(std::string repo, std::string game, std::string full, std::s
 // Asynchronous function to stop Rich Presence if nothing is recieved
 void checkIdle() {
 	bool allow = false;
+    bool already = false;
     auto& rpc = discord::RPCManager::get();
 	while (runIdleLoop) {
 		std::this_thread::sleep_for(std::chrono::seconds(5));
 		if (idle) {
-            if (allow) {
+            if (allow && !already) {
                 rpc.clearPresence();
                 fmt::println("Cleared Rich Presence");
-                while (idle && runIdleLoop) {}
+                already = true;
             } else {
                 allow = true;
             }
         }
         else {
             allow = false;
+            already = false;
         }
 		idle = true;
 	}
