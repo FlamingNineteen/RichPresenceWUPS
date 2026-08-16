@@ -71,7 +71,7 @@ Additionally, you can specify command-line arguments for advanced customization:
 - Append `port num` to change the UDP port number, where `num` is the port number you wish to use.
 
 ## Contribute
-The plugin is missing images of many Wii U games. If you are interested in adding game images, and have a Github account, check out the [image repository](https://github.com/flamingnineteen/RichPresenceWUPS-DB) for this plugin.
+The plugin might be missing images from a few Wii U games. If you are interested in adding game images, and have a Github account, check out the [image repository](https://github.com/flamingnineteen/RichPresenceWUPS-DB) for this plugin.
 
 ## Building
 For specifics on building either the plugin or the binary, please check their respective directories.
