@@ -23,7 +23,7 @@ This plugin uses UDP to communicate with an application on your computer to set 
 
 1. Download both the `RichPresence.wps` plugin and the `WURP-macOS` binary from the [Releases page](https://github.com/FlamingNineteen/RichPresenceWUPS/releases).
 2. Copy `RichPresence.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
-3. Keep the executable on your computer.
+3. Keep the binary on your computer.
 4. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
 </details>
 
@@ -33,7 +33,7 @@ This plugin uses UDP to communicate with an application on your computer to set 
 
 1. Download both the `RichPresence.wps` plugin and the `WURP-Linux` binary from the [Releases page](https://github.com/FlamingNineteen/RichPresenceWUPS/releases).
 2. Copy `RichPresence.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
-3. Keep the executable on your computer.
+3. Keep the binary on your computer.
 4. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
 
 **If you are using a systemd-based system and would like to have the application run on startup, follow these next steps:**
