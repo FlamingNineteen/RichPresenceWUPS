@@ -30,14 +30,14 @@
 #define CONFIG_COD_CONFIG_ID "cod"
 
 // Create a variable for each config option
-bool configEnabled        = CONFIG_ENABLED_DEFAULT_VALUE;
-bool configNetId          = CONFIG_NET_ID_DEFAULT_VALUE;
-int configTimeset         = CONFIG_TIMESET_DEFAULT_VALUE;
-DisplayOptions configCtrl = CONFIG_CTRL_DEFAULT_VALUE;
-bool configSmallImg       = CONFIG_SMALL_IMG_DEFAULT_VALUE;
-bool configDst            = CONFIG_DST_DEFAULT_VALUE;
-int configPort            = CONFIG_PORT_DEFAULT_VALUE;
-bool configCod            = CONFIG_COD_CONFIG_ID;
+bool configEnabled     = CONFIG_ENABLED_DEFAULT_VALUE;
+bool configNetId       = CONFIG_NET_ID_DEFAULT_VALUE;
+int configTimeset      = CONFIG_TIMESET_DEFAULT_VALUE;
+CtrlOptions configCtrl = CONFIG_CTRL_DEFAULT_VALUE;
+bool configSmallImg    = CONFIG_SMALL_IMG_DEFAULT_VALUE;
+bool configDst         = CONFIG_DST_DEFAULT_VALUE;
+int configPort         = CONFIG_PORT_DEFAULT_VALUE;
+bool configCod         = CONFIG_COD_CONFIG_ID;
 
 /**
  * Callbacks that will be called if the config has been changed
@@ -83,7 +83,7 @@ void integerRangeItemChanged(ConfigItemIntegerRange *item, int newValue) {
 void multipleValueItemChanged(ConfigItemMultipleValues *item, u_int32_t newValue) {
     // If the value has changed, we store it in the storage.
     if (std::string_view(CONFIG_CTRL_CONFIG_ID) == item->identifier) {
-        configCtrl = (DisplayOptions) newValue;
+        configCtrl = (CtrlOptions) newValue;
         // If the value has changed, we store it in the storage.
         WUPSStorageAPI::Store(item->identifier, newValue);
     }
@@ -94,19 +94,22 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
     WUPSConfigCategory root = WUPSConfigCategory(rootHandle);
 
     try {
-        // Setup information category
-        auto setupCat = WUPSConfigCategory::Create("Setup information");
+        /* 
+         * Setup Category
+        */
+        auto setupCat = WUPSConfigCategory::Create("Setup");
         setupCat.add(WUPSConfigItemStub::Create("This plugin works with a computer application."));
         setupCat.add(WUPSConfigItemStub::Create("That application must be running to update rich presence."));
         setupCat.add(WUPSConfigItemStub::Create("Check this plugin's repository for more information:"));
         setupCat.add(WUPSConfigItemStub::Create("https://github.com/flamingnineteen/RichPresenceWUPS"));
-        root.add(std::move(setupCat));
         
-        // Settings category
-        auto configCat = WUPSConfigCategory::Create("Plugin settings");
+        /* 
+         * Display Category
+        */
+        auto displayCat = WUPSConfigCategory::Create("Display");
 
         // Enable boolean
-        configCat.add(WUPSConfigItemBoolean::Create(CONFIG_ENABLED_CONFIG_ID, "Enable rich presence updates",
+        displayCat.add(WUPSConfigItemBoolean::Create(CONFIG_ENABLED_CONFIG_ID, "Enable rich presence updates",
                                                     CONFIG_ENABLED_DEFAULT_VALUE, configEnabled,
                                                     boolItemChanged));
         
@@ -118,51 +121,63 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         };
 
         // Display multiselect
-        configCat.add(WUPSConfigItemMultipleValues::CreateFromValue(CONFIG_CTRL_CONFIG_ID, "Show controller count",
+        displayCat.add(WUPSConfigItemMultipleValues::CreateFromValue(CONFIG_CTRL_CONFIG_ID, "Show controller count",
                                                                     CONFIG_CTRL_DEFAULT_VALUE, configCtrl,
                                                                     displayOptValues,
                                                                     multipleValueItemChanged));
         
         // Network ID boolean
-        configCat.add(WUPSConfigItemBoolean::Create(CONFIG_NET_ID_CONFIG_ID, "Show Network ID",
+        displayCat.add(WUPSConfigItemBoolean::Create(CONFIG_NET_ID_CONFIG_ID, "Show Network ID",
                                                     CONFIG_NET_ID_DEFAULT_VALUE, configNetId,
                                                     boolItemChanged));
 
         // Small image boolean
-        configCat.add(WUPSConfigItemBoolean::Create(CONFIG_SMALL_IMG_CONFIG_ID, "Show currently used network",
+        displayCat.add(WUPSConfigItemBoolean::Create(CONFIG_SMALL_IMG_CONFIG_ID, "Show currently used network",
                                                     CONFIG_SMALL_IMG_DEFAULT_VALUE, configSmallImg,
                                                     boolItemChanged));
 
         // Timeset integer range
-        configCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_TIMESET_CONFIG_ID, "Offset \"elapsed time\" timezone for correct display",
+        displayCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_TIMESET_CONFIG_ID, "Offset \"elapsed time\" timezone for correct display",
                                                          CONFIG_TIMESET_DEFAULT_VALUE, configTimeset,
                                                          -12, 12,
                                                          &integerRangeItemChanged));
         
         // Daylight savings time boolean
-        configCat.add(WUPSConfigItemBoolean::Create(CONFIG_DST_CONFIG_ID, "Conform to Daylight Savings Time",
+        displayCat.add(WUPSConfigItemBoolean::Create(CONFIG_DST_CONFIG_ID, "Conform to Daylight Savings Time",
                                                     CONFIG_DST_DEFAULT_VALUE, configDst,
                                                     boolItemChanged));
+        
+        /* 
+         * Advanced Category
+        */
+        auto advCat = WUPSConfigCategory::Create("Advanced");
 
         // Port integer range
-        configCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_PORT_CONFIG_ID, "UDP port (default 5005)",
+        advCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_PORT_CONFIG_ID, "UDP port (default 5005)",
                                                          CONFIG_PORT_DEFAULT_VALUE, configPort,
                                                          0, 65535,
                                                          &integerRangeItemChanged));
 
         // Call of Duty patch boolean
-        configCat.add(WUPSConfigItemBoolean::Create(CONFIG_COD_CONFIG_ID, "Enable Call of Duty patches",
+        advCat.add(WUPSConfigItemBoolean::Create(CONFIG_COD_CONFIG_ID, "Prevent Call of Duty crashes",
                                                     CONFIG_COD_DEFAULT_VALUE, configCod,
                                                     boolItemChanged));
-        
-        root.add(std::move(configCat));
 
-        // Contribute category
+        /* 
+         * Contribute Category
+        */
         auto helpCat = WUPSConfigCategory::Create("Contribute");
         helpCat.add(WUPSConfigItemStub::Create("The plugin might be missing images of some Wii U games."));
         helpCat.add(WUPSConfigItemStub::Create("If you are interested in adding game images, and"));
         helpCat.add(WUPSConfigItemStub::Create("have a Github account, check out this repository:"));
         helpCat.add(WUPSConfigItemStub::Create("https://github.com/flamingnineteen/RichPresenceWUPS-DB"));
+
+        /*
+         * Root Category
+        */
+        root.add(std::move(setupCat));
+        root.add(std::move(displayCat));
+        root.add(std::move(advCat));
         root.add(std::move(helpCat));
 
         return WUPSCONFIG_API_CALLBACK_RESULT_SUCCESS;

@@ -10,7 +10,7 @@
 /**
  * Options for controller display.
  */
-enum DisplayOptions {
+enum CtrlOptions {
     // Do not display controller count
     NODISPLAY = 0,
     
