@@ -17,29 +17,28 @@
 bool INKAY_EXISTS;
 std::string INKAY_CONFIG;
 
-// Returns the number of connected controllers
-int ctrlNum(DisplayOptions display) {
-    int c;
-    switch (display) {
-        case CTRLCOUNT:
-            c = 0;
-            break;
-        case CTRLCOUNTNODRC:
-            c = -1;
-            break;
-        default:
-            return -2;
-    }
+/**
+ * Gets the current number of connected controllers,
+ * excluding anything not directly connected to a
+ * WPAD channel.
+ * @return The current number of connected controllers.
+ */
+int GetCtrlNum() {
+    int c = 0;
     WPADExtensionType extType;
     for (int i = 0; i < 7; i++) {
-        int32_t result = WPADProbe(channels[i], &extType);
+        int32_t result = WPADProbe(WPAD_CHANS[i], &extType);
         if (result != -1) {c++;}
     }
     return c;
 }
 
-// Gets a tag from the application's xml
-std::string getXmlTag(std::string tag) {
+/**
+ * Gets a tag from the application's `meta.xml`.
+ * @param tag The tag to get.
+ * @return The value of the tag as a string.
+ */
+std::string GetXmlTag(std::string tag) {
     std::string result;
     ACPInitialize();
     auto *metaXml = (ACPMetaXml *) memalign(0x40, sizeof(ACPMetaXml));
@@ -61,8 +60,13 @@ std::string getXmlTag(std::string tag) {
     return result;
 }
 
-// Removes any instances of \n from a string
-std::string removeSlashN(std::string s) {
+/** 
+ * Replaces any instances of `"\\n"` from a string with
+ * `" "`, effectively putting everything onto one line.
+ * @param s The string to replace.
+ * @return The replaced string.
+ */
+std::string ReplaceSlashN(std::string s) {
     while (true) {
         size_t finder = s.find("\n");
         if (finder == std::string::npos) break;
@@ -71,25 +75,25 @@ std::string removeSlashN(std::string s) {
     return s;
 }
 
-// Gets the network id of the current account.
-std::string getNnid() {
-    if (configNetId) {
-        char account_id[256];
-        nn::act::GetAccountId(account_id);
-        std::string stickyId = account_id;
-        return stickyId;
-    } else return "";
+/**
+ * Gets the network id of the current account.
+ * @return The network id of the current account, as a string.
+ */
+std::string GetNetworkId() {
+    char account_id[256];
+    nn::act::GetAccountId(account_id);
+    std::string stickyId = account_id;
+    return stickyId;
 }
 
 /**
  * Gets the currently used network.
  * Network is decided by the Inkay config file.
- * @returns
- * `nn` for Nintendo,
- * `pn` for Pretendo,
- * nothing for neither
+ * @return `"nn"` for Nintendo,
+ * @return `"pn"` for Pretendo,
+ * @return `""` for neither.
  */
-std::string getNetwork() {
+std::string GetNetwork() {
     if (configSmallImg) {
         if (INKAY_EXISTS) {
             std::ifstream acc(INKAY_CONFIG);

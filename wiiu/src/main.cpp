@@ -1,9 +1,8 @@
 #include <filesystem>
 #include <fstream>
 #include <malloc.h>
+#include <string.h>
 #include <thread>
-
-// #include <mocha/mocha.h>
 
 #include "config.hpp"
 #include "utils.hpp"
@@ -30,13 +29,12 @@ WUPS_USE_STORAGE("rich_presence"); // Unique id for the storage api
 
 // Create miscellanious variables
 std::jthread tthread;
-std::string nnid;
 int elapsed;
-std::string app              = "";
-std::string preapp           = "quantum random!!!11!";
+std::string app    = "";
+std::string preapp = "quantum random!!!11!";
 
 // Broadcast over port 5005
-void broadcast(const std::string& json) {
+void Broadcast(const std::string& json) {
     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock < 0) return;
 
@@ -53,13 +51,31 @@ void broadcast(const std::string& json) {
 }
 
 // Main background loop to broadcast current info
-void gameLoop(std::stop_token stoken) {
+void GameLoop(std::stop_token stoken) {
+    int ctrls;
+    std::string nnid;
+    std::string json;
+
     while (!stoken.stop_requested() && configEnabled) {
         if (app != "") {
-            int ctrls = ctrlNum(configCtrl);
-            nnid = getNnid();
-            std::string json = "{\"sender\":\"Wii U\",\"long\":\"" + removeSlashN(getXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + getNetwork() + "\",\"dst\":" + std::to_string(configDst) + "}";
-            broadcast(json);
+            // Get controller count
+            switch (configCtrl) {
+                case CTRLCOUNT:
+                    ctrls = GetCtrlNum();
+                    break;
+                case CTRLCOUNTNODRC:
+                    ctrls = GetCtrlNum()-1;
+                    break;
+                default:
+                    ctrls = -2;
+            }
+
+            // Get Network ID
+            nnid = configNetId ? GetNetworkId() : "";
+
+            // Prepare and send json
+            json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + GetNetwork() + "\",\"dst\":" + std::to_string(configDst) + "}";
+            Broadcast(json);
         }
 
         // Five second interval
@@ -85,8 +101,6 @@ INITIALIZE_PLUGIN() {
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_COD_CONFIG_ID, configCod, CONFIG_COD_DEFAULT_VALUE);
     WUPSStorageAPI::SaveStorage();
 
-    if (static_cast<int>(configCtrl) > 2) nnid = getNnid();
-
     char environment_path_buffer[0x100];
     Mocha_GetEnvironmentPath(environment_path_buffer, sizeof(environment_path_buffer));
     INKAY_CONFIG = std::string(environment_path_buffer) + std::string("/plugins/config/inkay.json");
@@ -94,15 +108,17 @@ INITIALIZE_PLUGIN() {
 }
 
 ON_APPLICATION_START() {
-    app = getXmlTag("shortname_en");
+    app = GetXmlTag("shortname_en");
     if (app == "Health and Safety Information") app = "Homebrew Application";
+
     if (app != preapp) elapsed = time(NULL); // Only update elapsed time if app changed
     preapp = app;
+
     if (tthread.joinable()) {
         tthread.request_stop();
         tthread.join(); // Wait for thread to finish before starting a new one
     }
-    if (configEnabled && !(configCod && app.find("Call of Duty") != std::string::npos)) tthread = std::jthread(gameLoop);
+    if (configEnabled && !(configCod && app.find("Call of Duty") != std::string::npos)) tthread = std::jthread(GameLoop);
 }
 
 ON_APPLICATION_REQUESTS_EXIT() {    

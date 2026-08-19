@@ -159,7 +159,7 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
 
         // Contribute category
         auto helpCat = WUPSConfigCategory::Create("Contribute");
-        helpCat.add(WUPSConfigItemStub::Create("The plugin is missing images of many Wii U games."));
+        helpCat.add(WUPSConfigItemStub::Create("The plugin might be missing images of some Wii U games."));
         helpCat.add(WUPSConfigItemStub::Create("If you are interested in adding game images, and"));
         helpCat.add(WUPSConfigItemStub::Create("have a Github account, check out this repository:"));
         helpCat.add(WUPSConfigItemStub::Create("https://github.com/flamingnineteen/RichPresenceWUPS-DB"));
