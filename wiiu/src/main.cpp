@@ -33,6 +33,9 @@ int elapsed;
 std::string app    = "";
 std::string preapp = "quantum random!!!11!";
 
+bool INKAY_EXISTS;
+std::string INKAY_CONFIG;
+
 // Broadcast over port 5005
 void Broadcast(const std::string& json) {
     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -74,7 +77,7 @@ void GameLoop(std::stop_token stoken) {
             nnid = configNetId ? GetNetworkId() : "";
 
             // Prepare and send json
-            json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + GetNetwork() + "\",\"dst\":" + std::to_string(configDst) + "}";
+            json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + (configSmallImg ? GetNetwork(INKAY_EXISTS, INKAY_CONFIG) : "") + "\",\"dst\":" + std::to_string(configDst) + "}";
             Broadcast(json);
         }
 

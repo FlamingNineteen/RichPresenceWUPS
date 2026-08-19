@@ -14,9 +14,6 @@
 
 #include "consts.hpp"
 
-bool INKAY_EXISTS;
-std::string INKAY_CONFIG;
-
 /**
  * Gets the current number of connected controllers,
  * excluding anything not directly connected to a
@@ -91,34 +88,28 @@ std::string GetNetworkId() {
  * Network is decided by the Inkay config file.
  * @return `"nn"` for Nintendo,
  * @return `"pn"` for Pretendo,
- * @return `""` for neither.
+ * @return `""` upon error.
  */
-std::string GetNetwork() {
-    if (configSmallImg) {
-        if (INKAY_EXISTS) {
-            std::ifstream acc(INKAY_CONFIG);
-            if (!acc.is_open()) {
-                return "";
-            }
+std::string GetNetwork(bool inkayExists, std::string inkayConfig) {
+    if (inkayExists) {
+        std::ifstream acc(inkayConfig);
+        if (!acc.is_open()) {
+            return "";
+        }
 
-            size_t pos;
-            std::string line;
-            while (std::getline(acc, line)) {
-                pos = line.find("connect_to_network");
+        size_t pos;
+        std::string line;
+        while (std::getline(acc, line)) {
+            pos = line.find("connect_to_network");
+            if (pos != std::string::npos) {
+                pos = line.find("true");
                 if (pos != std::string::npos) {
-                    pos = line.find("true");
-                    if (pos != std::string::npos) {
-                        return "pn";
-                    } else {
-                        return "nn";
-                    }
+                    return "pn";
+                } else {
+                    return "nn";
                 }
             }
-            return "nn";
-        } else {
-            return "nn";
         }
-    } else {
-        return "";
     }
+    return "nn";
 }
