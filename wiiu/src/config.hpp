@@ -16,6 +16,8 @@
 #define CONFIG_TIMESET_DEFAULT_VALUE 0
 #define CONFIG_CTRL_DEFAULT_VALUE CTRLCOUNT
 #define CONFIG_DST_DEFAULT_VALUE true
+#define CONFIG_TITLE_DEFAULT_VALUE false
+#define CONFIG_LANG_DEFAULT_VALUE ENGLISH
 #define CONFIG_PORT_DEFAULT_VALUE 5005
 #define CONFIG_COD_DEFAULT_VALUE true
 
@@ -26,6 +28,8 @@
 #define CONFIG_CTRL_CONFIG_ID "display"
 #define CONFIG_SMALL_IMG_CONFIG_ID "smallimg"
 #define CONFIG_DST_CONFIG_ID "dst"
+#define CONFIG_TITLE_CONFIG_ID "title"
+#define CONFIG_LANG_CONFIG_ID "lang"
 #define CONFIG_PORT_CONFIG_ID "port"
 #define CONFIG_COD_CONFIG_ID "cod"
 
@@ -36,6 +40,8 @@ int configTimeset      = CONFIG_TIMESET_DEFAULT_VALUE;
 CtrlOptions configCtrl = CONFIG_CTRL_DEFAULT_VALUE;
 bool configSmallImg    = CONFIG_SMALL_IMG_DEFAULT_VALUE;
 bool configDst         = CONFIG_DST_DEFAULT_VALUE;
+bool configTitle       = CONFIG_TITLE_DEFAULT_VALUE;
+LangOptions configLang = CONFIG_LANG_DEFAULT_VALUE;
 int configPort         = CONFIG_PORT_DEFAULT_VALUE;
 bool configCod         = CONFIG_COD_CONFIG_ID;
 
@@ -53,6 +59,10 @@ void boolItemChanged(ConfigItemBoolean *item, bool newValue) {
 
     if (std::string_view(CONFIG_SMALL_IMG_CONFIG_ID) == item->identifier) {
         configSmallImg = newValue;
+    }
+
+    if (std::string_view(CONFIG_TITLE_CONFIG_ID) == item->identifier) {
+        configTitle = newValue;
     }
 
     if (std::string_view(CONFIG_DST_CONFIG_ID) == item->identifier) {
@@ -81,12 +91,16 @@ void integerRangeItemChanged(ConfigItemIntegerRange *item, int newValue) {
 }
 
 void multipleValueItemChanged(ConfigItemMultipleValues *item, u_int32_t newValue) {
-    // If the value has changed, we store it in the storage.
     if (std::string_view(CONFIG_CTRL_CONFIG_ID) == item->identifier) {
         configCtrl = (CtrlOptions) newValue;
-        // If the value has changed, we store it in the storage.
-        WUPSStorageAPI::Store(item->identifier, newValue);
     }
+
+    if (std::string_view(CONFIG_LANG_CONFIG_ID) == item->identifier) {
+        configLang = (LangOptions) newValue;
+    }
+
+    // If the value has changed, we store it in the storage.
+    WUPSStorageAPI::Store(item->identifier, newValue);
 }
 
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
@@ -113,17 +127,17 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
                                                     CONFIG_ENABLED_DEFAULT_VALUE, configEnabled,
                                                     boolItemChanged));
         
-        // Display options
-        constexpr WUPSConfigItemMultipleValues::ValuePair displayOptValues[] = {
-                {NODISPLAY, "none"},
-                {CTRLCOUNTNODRC, "exclude Gamepad"},
-                {CTRLCOUNT, "all"}
+        // Controller count options
+        constexpr WUPSConfigItemMultipleValues::ValuePair ctrlOptValues[] = {
+            {NODISPLAY, "none"},
+            {CTRLCOUNTNODRC, "exclude Gamepad"},
+            {CTRLCOUNT, "all"}
         };
 
-        // Display multiselect
+        // Controller count multiselect
         displayCat.add(WUPSConfigItemMultipleValues::CreateFromValue(CONFIG_CTRL_CONFIG_ID, "Show controller count",
                                                                     CONFIG_CTRL_DEFAULT_VALUE, configCtrl,
-                                                                    displayOptValues,
+                                                                    ctrlOptValues,
                                                                     multipleValueItemChanged));
         
         // Network ID boolean
@@ -146,7 +160,34 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         displayCat.add(WUPSConfigItemBoolean::Create(CONFIG_DST_CONFIG_ID, "Conform to Daylight Savings Time",
                                                     CONFIG_DST_DEFAULT_VALUE, configDst,
                                                     boolItemChanged));
+
+        // Title boolean
+        displayCat.add(WUPSConfigItemBoolean::Create(CONFIG_TITLE_CONFIG_ID, "Display full title",
+                                                    CONFIG_TITLE_DEFAULT_VALUE, configTitle,
+                                                    boolItemChanged));
+            
+        // Primary language options
+        constexpr WUPSConfigItemMultipleValues::ValuePair langOptValues[] = {
+            {ENGLISH, "English (Default)"},
+            {JAPANESE, "Japanese"},
+            {FRENCH, "French"},
+            {GERMAN, "German"},
+            {ITALIAN, "Italian"},
+            {SPANISH, "Spanish"},
+            {SIMP_CHINESE, "Simplified Chinese"},
+            {KOREAN, "Korean"},
+            {DUTCH, "Dutch"},
+            {PORTUGUESE, "Portuguese"},
+            {RUSSIAN, "Russian"},
+            {TRAD_CHINESE, "Traditional Chinese"},
+        };
         
+        // Primary language multiselect
+        displayCat.add(WUPSConfigItemMultipleValues::CreateFromValue(CONFIG_LANG_CONFIG_ID, "Primary title display language",
+                                                                    CONFIG_LANG_DEFAULT_VALUE, configLang,
+                                                                    langOptValues,
+                                                                    multipleValueItemChanged));
+
         /* 
          * Advanced Category
         */
@@ -184,6 +225,6 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
     } catch (std::exception &e) {return WUPSCONFIG_API_CALLBACK_RESULT_ERROR;}
 }
 
-void ConfigMenuClosedCallback() {
-    WUPSStorageAPI::SaveStorage();
-}
+// void ConfigMenuClosedCallback() {
+//     WUPSStorageAPI::SaveStorage();
+// }

@@ -77,7 +77,7 @@ void GameLoop(std::stop_token stoken) {
             nnid = configNetId ? GetNetworkId() : "";
 
             // Prepare and send json
-            json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetXmlTag("longname_en")) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + (configSmallImg ? GetNetwork(INKAY_EXISTS, INKAY_CONFIG) : "") + "\",\"dst\":" + std::to_string(configDst) + "}";
+            json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetAppTitle(ENGLISH, true)) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + (configSmallImg ? GetNetwork(INKAY_EXISTS, INKAY_CONFIG) : "") + "\",\"dst\":" + std::to_string(configDst) + "}";
             Broadcast(json);
         }
 
@@ -87,6 +87,22 @@ void GameLoop(std::stop_token stoken) {
         }
     }
     return;
+}
+
+void ConfigMenuClosedCallback() {
+    WUPSStorageAPI::SaveStorage();
+
+    app = GetXmlTag("shortname_en") == "Health and Safety Information" ? "Homebrew Application" : ReplaceSlashN(GetAppTitle(configLang, configTitle));
+    preapp = app;
+
+    if (tthread.joinable()) {
+        tthread.request_stop();
+        tthread.join(); // Wait for thread to finish before starting a new one
+    }
+
+    if ((configEnabled && !(configCod && app.find("Call of Duty") != std::string::npos))) {
+        tthread = std::jthread(GameLoop);
+    }
 }
 
 INITIALIZE_PLUGIN() {
@@ -100,6 +116,8 @@ INITIALIZE_PLUGIN() {
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_CTRL_CONFIG_ID, configCtrl, CONFIG_CTRL_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_SMALL_IMG_CONFIG_ID, configSmallImg, CONFIG_SMALL_IMG_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_DST_CONFIG_ID, configDst, CONFIG_DST_DEFAULT_VALUE);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_TITLE_CONFIG_ID, configTitle, CONFIG_TITLE_DEFAULT_VALUE);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_LANG_CONFIG_ID, configLang, CONFIG_LANG_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_PORT_CONFIG_ID, configPort, CONFIG_PORT_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_COD_CONFIG_ID, configCod, CONFIG_COD_DEFAULT_VALUE);
     WUPSStorageAPI::SaveStorage();
@@ -111,8 +129,7 @@ INITIALIZE_PLUGIN() {
 }
 
 ON_APPLICATION_START() {
-    app = GetXmlTag("shortname_en");
-    if (app == "Health and Safety Information") app = "Homebrew Application";
+    app = GetXmlTag("shortname_en") == "Health and Safety Information" ? "Homebrew Application" : ReplaceSlashN(GetAppTitle(configLang, configTitle)); 
 
     if (app != preapp) elapsed = time(NULL); // Only update elapsed time if app changed
     preapp = app;

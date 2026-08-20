@@ -39,22 +39,113 @@ std::string GetXmlTag(std::string tag) {
     std::string result;
     ACPInitialize();
     auto *metaXml = (ACPMetaXml *) memalign(0x40, sizeof(ACPMetaXml));
-    if (metaXml)
-    {
-        if (ACPGetTitleMetaXml(OSGetTitleID(), metaXml) == ACP_RESULT_SUCCESS)
-        {
-            if (tag == "longname_en") result = metaXml->longname_en;
-            else if (tag == "shortname_en") result = metaXml->shortname_en;
-            else result.clear();
+    if (metaXml) {
+        if (ACPGetTitleMetaXml(OSGetTitleID(), metaXml) == ACP_RESULT_SUCCESS) {
+            if (tag ==  "longname_en") {
+                result = metaXml->longname_en;
+            }
+            else if (tag ==  "shortname_en") {
+                result = metaXml->shortname_en;
+            }
+            else if (tag ==  "longname_ja") {
+                result = metaXml->longname_ja;
+            }
+            else if (tag ==  "shortname_ja") {
+                result = metaXml->shortname_ja;
+            }
+            else if (tag ==  "longname_fr") {
+                result = metaXml->longname_fr;
+            }
+            else if (tag ==  "shortname_fr") {
+                result = metaXml->shortname_fr;
+            }
+            else if (tag ==  "longname_de") {
+                result = metaXml->longname_de;
+            }
+            else if (tag ==  "shortname_de") {
+                result = metaXml->shortname_de;
+            }
+            else if (tag ==  "longname_it") {
+                result = metaXml->longname_it;
+            }
+            else if (tag ==  "shortname_it") {
+                result = metaXml->shortname_it;
+            }
+            else if (tag ==  "longname_es") {
+                result = metaXml->longname_es;
+            }
+            else if (tag ==  "shortname_es") {
+                result = metaXml->shortname_es;
+            }
+            else if (tag ==  "longname_zhs") {
+                result = metaXml->longname_zhs;
+            }
+            else if (tag ==  "shortname_zhs") {
+                result = metaXml->shortname_zhs;
+            }
+            else if (tag ==  "longname_ko") {
+                result = metaXml->longname_ko;
+            }
+            else if (tag ==  "shortname_ko") {
+                result = metaXml->shortname_ko;
+            }
+            else if (tag ==  "longname_nl") {
+                result = metaXml->longname_nl;
+            }
+            else if (tag ==  "shortname_nl") {
+                result = metaXml->shortname_nl;
+            }
+            else if (tag ==  "longname_pt") {
+                result = metaXml->longname_pt;
+            }
+            else if (tag ==  "shortname_ru") {
+                result = metaXml->shortname_ru;
+            }
+            else if (tag ==  "longname_zht") {
+                result = metaXml->longname_zht;
+            }
+            else if (tag ==  "shortname_zht") {
+                result = metaXml->shortname_zht;
+            }
+            else {
+                result.clear();
+            }
         }
-        else
-        {
+        else {
             result.clear();
         }
         free(metaXml);
     }
     ACPFinalize();
     return result;
+}
+
+/**
+ * Attempts to get a title from the application's `meta.xml`.
+ * If the chosen title is blank it will try other languages.
+ * @param full Whether or not to get the full title.
+ * @param lang The language from the LangOptions enum.
+ * @return The title string
+ */
+std::string GetAppTitle(LangOptions lang = ENGLISH, bool full = false) {
+    std::string len = full ? "longname_" : "shortname_";
+    std::string result = GetXmlTag(len + LANG_STRINGS[static_cast<int>(lang)]);
+
+    if (result != "") {
+        return result;
+    }
+    else {
+        // Try every language in order as they appear in `meta.xml`
+        for (std::string i : LANG_STRINGS) {
+            result = GetXmlTag(len + i);
+
+            if (result != "") {
+                return result;
+            }
+        }
+    }
+
+    return "";
 }
 
 /** 
@@ -87,8 +178,8 @@ std::string GetNetworkId() {
  * Gets the currently used network.
  * Network is decided by the Inkay config file.
  * @return `"nn"` for Nintendo,
- * @return `"pn"` for Pretendo,
- * @return `""` upon error.
+ *         `"pn"` for Pretendo,
+ *         `""` upon error.
  */
 std::string GetNetwork(bool inkayExists, std::string inkayConfig) {
     if (inkayExists) {
