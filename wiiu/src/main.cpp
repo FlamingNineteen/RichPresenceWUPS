@@ -47,7 +47,8 @@ void Broadcast(const std::string& json) {
     sockaddr_in dest {};
     dest.sin_family = AF_INET;
     dest.sin_port = htons(configPort);
-    dest.sin_addr.s_addr = inet_addr("255.255.255.255");
+
+    dest.sin_addr.s_addr = inet_addr(configIpFilter ? IpToString(configIp).c_str() : "255.255.255.255");
 
     sendto(sock, json.c_str(), json.size(), 0, reinterpret_cast<sockaddr*>(&dest), sizeof(dest));
     close(sock);
@@ -118,6 +119,8 @@ INITIALIZE_PLUGIN() {
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_DST_CONFIG_ID, configDst, CONFIG_DST_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_TITLE_CONFIG_ID, configTitle, CONFIG_TITLE_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_LANG_CONFIG_ID, configLang, CONFIG_LANG_DEFAULT_VALUE);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_IP_CONFIG_ID, configIp, CONFIG_IP_DEFAULT_VALUE);
+    WUPSStorageAPI::GetOrStoreDefault(CONFIG_IP_FILTER_CONFIG_ID, configIpFilter, CONFIG_IP_FILTER_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_PORT_CONFIG_ID, configPort, CONFIG_PORT_DEFAULT_VALUE);
     WUPSStorageAPI::GetOrStoreDefault(CONFIG_COD_CONFIG_ID, configCod, CONFIG_COD_DEFAULT_VALUE);
     WUPSStorageAPI::SaveStorage();

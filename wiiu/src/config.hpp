@@ -3,6 +3,7 @@
 #include <wups/config/WUPSConfigCategory.h>
 #include <wups/config/WUPSConfigItemBoolean.h>
 #include <wups/config/WUPSConfigItemIntegerRange.h>
+#include <wups/config/WUPSConfigItemIPAddress.h>
 #include <wups/config/WUPSConfigItemMultipleValues.h>
 #include <wups/config/WUPSConfigItemStub.h>
 #include <wups/config_api.h>
@@ -18,6 +19,8 @@
 #define CONFIG_DST_DEFAULT_VALUE true
 #define CONFIG_TITLE_DEFAULT_VALUE false
 #define CONFIG_LANG_DEFAULT_VALUE ENGLISH
+#define CONFIG_IP_FILTER_DEFAULT_VALUE false
+#define CONFIG_IP_DEFAULT_VALUE (uint32_t) UINT32_MAX
 #define CONFIG_PORT_DEFAULT_VALUE 5005
 #define CONFIG_COD_DEFAULT_VALUE true
 
@@ -30,6 +33,8 @@
 #define CONFIG_DST_CONFIG_ID "dst"
 #define CONFIG_TITLE_CONFIG_ID "title"
 #define CONFIG_LANG_CONFIG_ID "lang"
+#define CONFIG_IP_FILTER_CONFIG_ID "ipfilter"
+#define CONFIG_IP_CONFIG_ID "ip"
 #define CONFIG_PORT_CONFIG_ID "port"
 #define CONFIG_COD_CONFIG_ID "cod"
 
@@ -42,6 +47,8 @@ bool configSmallImg    = CONFIG_SMALL_IMG_DEFAULT_VALUE;
 bool configDst         = CONFIG_DST_DEFAULT_VALUE;
 bool configTitle       = CONFIG_TITLE_DEFAULT_VALUE;
 LangOptions configLang = CONFIG_LANG_DEFAULT_VALUE;
+bool configIpFilter    = CONFIG_IP_FILTER_DEFAULT_VALUE;
+uint32_t configIp      = CONFIG_IP_DEFAULT_VALUE;
 int configPort         = CONFIG_PORT_DEFAULT_VALUE;
 bool configCod         = CONFIG_COD_CONFIG_ID;
 
@@ -69,6 +76,10 @@ void boolItemChanged(ConfigItemBoolean *item, bool newValue) {
         configDst = newValue;
     }
 
+    if (std::string_view(CONFIG_IP_FILTER_CONFIG_ID) == item->identifier) {
+        configIpFilter = newValue;
+    }
+
     if (std::string_view(CONFIG_COD_CONFIG_ID) == item->identifier) {
         configCod = newValue;
     }
@@ -84,6 +95,15 @@ void integerRangeItemChanged(ConfigItemIntegerRange *item, int newValue) {
 
     if (std::string_view(CONFIG_PORT_CONFIG_ID) == item->identifier) {
         configPort = newValue;
+    }
+
+    // If the value has changed, we store it in the storage.
+    WUPSStorageAPI::Store(item->identifier, newValue);
+}
+
+void ipAddressItemChanged(ConfigItemIPAddress *item, uint32_t newValue) {
+    if (std::string_view(CONFIG_IP_CONFIG_ID) == item->identifier) {
+        configIp = newValue;
     }
 
     // If the value has changed, we store it in the storage.
@@ -192,6 +212,16 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
          * Advanced Category
         */
         auto advCat = WUPSConfigCategory::Create("Advanced");
+
+        // IP filter boolean
+        advCat.add(WUPSConfigItemBoolean::Create(CONFIG_IP_FILTER_CONFIG_ID, "Only send data to a specific IP address",
+                                                CONFIG_IP_FILTER_DEFAULT_VALUE, configIpFilter,
+                                                &boolItemChanged));
+
+        // Sender ip address selection
+        advCat.add(WUPSConfigItemIPAddress::Create(CONFIG_IP_CONFIG_ID, "IP address to send data to",
+                                                    CONFIG_IP_DEFAULT_VALUE, configIp,
+                                                    &ipAddressItemChanged));
 
         // Port integer range
         advCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_PORT_CONFIG_ID, "UDP port (default 5005)",
