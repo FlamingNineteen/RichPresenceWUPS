@@ -2,9 +2,6 @@
 
 This plugin uses UDP to communicate with an application on your computer to set Discord Rich Presence for the user. The activity is set based on the application currently being played, the time the application was loaded, and the amount of controllers connected.
 
-> [!NOTE]
-> After installing, if Discord incorrectly reflects the amount of time you have been playing, open the plugin configuration menu and change the "Offset 'elapsed time' timezone for correct display" setting. If elapsed time displays `0:00:00`, you need to change the setting to a negative number. If the elapsed time displays hours ahead of your actual play time, you need to change the setting to a positive number.
-
 ## Installation
 
 <details>
@@ -63,6 +60,9 @@ pip install requests pypresence
 ```
 </details>
 
+> [!NOTE]
+> After installing, if Discord incorrectly reflects the amount of time you have been playing, open the plugin configuration menu and change the "Offset 'elapsed time' timezone for correct display" setting. If elapsed time displays `0:00:00`, you need to change the setting to a negative number. If the elapsed time displays hours ahead of your actual play time, you need to change the setting to a positive number.
+
 ## Usage
 Start your Wii U with the environment you placed the plugin in, and run the executable, binary, or Python file with the Discord app open.
 
@@ -75,5 +75,5 @@ The plugin might be missing images from a few Wii U games. If you are interested
 
 ## Building
 For specifics on building either the plugin or the binary, please check their respective directories:
-- Plugin: wiiu/README.md
-- Binary: discord/README.md
+- Plugin: [wiiu/README.md](https://github.com/FlamingNineteen/RichPresenceWUPS/blob/main/wiiu/README.md)
+- Binary: [discord/README.md](https://github.com/FlamingNineteen/RichPresenceWUPS/blob/main/discord/README.md)

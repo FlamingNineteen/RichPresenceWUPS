@@ -1,7 +1,7 @@
 /**
  * The version number of the plugin.
  */
-#define VERSION "v2.11"
+#define VERSION "v2.2"
 
 #pragma once
 

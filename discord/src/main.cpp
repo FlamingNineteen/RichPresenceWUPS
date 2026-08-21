@@ -1,4 +1,4 @@
-constexpr double VERSION = 2.1;
+constexpr double VERSION = 2.2;
 
 #include <thread>
 
