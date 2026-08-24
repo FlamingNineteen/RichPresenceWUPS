@@ -4,16 +4,16 @@
 set -e
 
 # check if the binary actually exists in the current directory first
-if [ ! -f "WURP-Linux" ]; then
-    echo "Error: WURP-Linux binary not found in the current directory."
-    echo "Please run this script from the folder where WURP-Linux is located."
+if [ ! -f "WiiURichPresence" ]; then
+    echo "Error: WiiURichPresence binary not found in the current directory."
+    echo "Please run this script from the folder where WiiURichPresence is located."
     exit 1
 fi
 
-# moves WURP-Linux to local binaries folder and makes it executable
+# moves WiiURichPresence to local binaries folder and makes it executable
 mkdir -p ~/.local/bin
-mv WURP-Linux ~/.local/bin/
-chmod +x ~/.local/bin/WURP-Linux
+mv WiiURichPresence ~/.local/bin/
+chmod +x ~/.local/bin/WiiURichPresence
 
 # set up systemd service
 mkdir -p ~/.config/systemd/user
@@ -24,7 +24,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/WURP-Linux
+ExecStart=%h/.local/bin/WiiURichPresence
 Restart=on-failure
 
 [Install]
