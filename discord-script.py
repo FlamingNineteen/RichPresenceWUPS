@@ -112,20 +112,23 @@ async def main():
                 except:
                     image = "preview"
                 
-                img = data['img'] if 'img' in data else ''
-                dst = (data['dst'] == 1) if 'dst' in data else False
+                img     = data['img'] if 'img' in data else ''
+                dst     = (data['dst'] == 1) if 'dst' in data else False
+                details = data['details'] if 'details' in data else ''
 
                 await asyncio.to_thread(client.update,
+                    name=                data["app"],
                     activity_type=       ActivityType.PLAYING,
-                    status_display_type= StatusDisplayType.STATE,
-                    state=               data["app"],
-                    details=             None if data["nnid"] == '' else f"Network ID: {data["nnid"]}",
+                    status_display_type= StatusDisplayType.NAME,
+                    state=               "NID: " + data["nnid"] if data["nnid"] != "" else None,
+                    details=             details if details != '' else "Playing on the Wii U",
                     start=               toepoch(data["time"], dst),
                     large_image=         image,
                     large_text=          data["long"],
-                    party_size=          [data["ctrls"] + 1 if data["ctrls"] > -2 else 0, 4 if data["ctrls"] < 4 else 8],
                     small_image=         None if img == "" else img,
-                    small_text=          f"Using {"Nintendo" if img == "nn" else "Pretendo"} Network"
+                    small_text=          f"Using {"Nintendo" if img == "nn" else "Pretendo"} Network",
+                    party_size=          [data["ctrls"] + 1 if data["ctrls"] > -2 else 0, 4 if data["ctrls"] < 4 else 8]
+                    instance=            False
                 )
 
                 print("Updated Rich Presence")

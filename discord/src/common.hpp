@@ -28,27 +28,28 @@ void discordSetup() {
 }
 
 // Sets the Rich Presence
-void updatePresence(std::string repo, std::string game, std::string full, std::string nnid, int ctrls, std::string jpg, std::string img, time_t start) {
+void updatePresence(std::string repo, std::string game, std::string full, std::string nnid, int ctrls, std::string jpg, std::string img, time_t start, std::string details = "") {
     idle = false;
     auto& rpc = discord::RPCManager::get();
-    int maxParty = (ctrls + 1 > 4) ? 8 : 4;
 
     rpc.getPresence()
-        .setState(game)
+        .setName(game)
         .setActivityType(discord::ActivityType::Game)
-        .setStatusDisplayType(discord::StatusDisplayType::State)
-        .setDetails((nnid == "") ? "" : "Network ID: " + nnid)
+        .setStatusDisplayType(discord::StatusDisplayType::Name)
+        .setState(nnid != "" ? "NID: " + nnid : "")
+        .setDetails(details != "" ? details : "Playing on the Wii U")
         .setStartTimestamp(start)
         .setLargeImageKey((jpg == "oh no it didn't work") ? "preview" : ("https://raw.githubusercontent.com/" + repo + "/main/icons/" + jpg))
         .setLargeImageText(full)
         .setSmallImageKey(img == "backwards" ? "" : img)
-        .setSmallImageText(img == "nn" ? "Using Nintendo Network" : "Using Pretendo Network")
+        .setSmallImageText((nnid == "" || details == "") ? (img == "nn" ? "Using Nintendo Network" : "Using Pretendo Network") : ("ID: " + nnid))
         .setPartyID(ctrls > -2 ? "wiiu" : "")
         .setPartySize(ctrls > -2 ? ctrls + 1 : 0)
-        .setPartyMax(maxParty)
+        .setPartyMax((ctrls + 1 > 4) ? 8 : 4)
         .setPartyPrivacy(discord::PartyPrivacy::Public)
         .setInstance(false)
         .refresh();
+    
     fmt::println("Updated Rich Presence");
 }
 
@@ -101,7 +102,7 @@ short parseJsonAndUpdate(std::string msg, json images, std::string repo, time_t 
         
         // Update presence, but also make sure it's backwards compatible
         if (out.contains("dst")) { // Update 2.1
-            updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"], out["dst"] == 1));
+            updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"], out["dst"] == 1), out.contains("details") ? out["details"] : "");
         }
         else if (out.contains("img")) { // Update 2.0
             updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"], false));
