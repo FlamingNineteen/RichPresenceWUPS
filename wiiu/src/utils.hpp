@@ -206,12 +206,12 @@ std::string GetNetwork(bool inkayExists, std::string inkayConfig) {
 }
 
 /**
- * Takes an unsigned 32 bit integer (`u_int32_t`)
+ * Takes an unsigned 32 bit integer (`uint32_t`)
  * IP address and puts it into string format.
  * @param ip The integer IP address.
  * @return The IP address as a string.
  */
-std::string IpToString(u_int32_t ip) {
+std::string IpToString(uint32_t ip) {
     return std::to_string(ip / (256*256*256)) + "."
          + std::to_string((ip / (256*256)) % 256) + "."
          + std::to_string((ip / 256) % 256) + "."

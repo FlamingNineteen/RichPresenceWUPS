@@ -110,7 +110,7 @@ void ipAddressItemChanged(ConfigItemIPAddress *item, uint32_t newValue) {
     WUPSStorageAPI::Store(item->identifier, newValue);
 }
 
-void multipleValueItemChanged(ConfigItemMultipleValues *item, u_int32_t newValue) {
+void multipleValueItemChanged(ConfigItemMultipleValues *item, uint32_t newValue) {
     if (std::string_view(CONFIG_CTRL_CONFIG_ID) == item->identifier) {
         configCtrl = (CtrlOptions) newValue;
     }
