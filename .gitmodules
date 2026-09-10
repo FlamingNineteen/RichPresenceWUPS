@@ -1,3 +1,4 @@
 [submodule "discord/discord-presence"]
 	path = discord/discord-presence
-	url = https://git.eclipse.menu/EclipseMenu/discord-presence
+	# url = https://git.eclipse.menu/EclipseMenu/discord-presence
+	url = https://github.com/FlamingNineteen/discord-presence
