@@ -42,7 +42,7 @@ void updatePresence(std::string repo, std::string game, std::string full, std::s
         .setLargeImageKey((jpg == "oh no it didn't work") ? "preview" : ("https://raw.githubusercontent.com/" + repo + "/main/icons/" + jpg))
         .setLargeImageText(full)
         .setSmallImageKey(img == "backwards" ? "" : img)
-        .setSmallImageText((nnid == "" || details == "") ? (img == "nn" ? "Using Nintendo Network" : "Using Pretendo Network") : ("ID: " + nnid))
+        .setSmallImageText(img == "nn" ? "Using Nintendo Network" : "Using Pretendo Network")
         .setPartyID(ctrls > -2 ? "wiiu" : "")
         .setPartySize(ctrls > -2 ? ctrls + 1 : 0)
         .setPartyMax((ctrls + 1 > 4) ? 8 : 4)

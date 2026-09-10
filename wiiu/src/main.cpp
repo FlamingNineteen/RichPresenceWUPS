@@ -4,6 +4,8 @@
 #include <string.h>
 #include <thread>
 
+#include <mocha/mocha.h>
+
 #include "config.hpp"
 #include "utils.hpp"
 
@@ -16,13 +18,6 @@ WUPS_PLUGIN_DESCRIPTION("Discord Rich Presence for the Wii U.");
 WUPS_PLUGIN_VERSION(VERSION);
 WUPS_PLUGIN_AUTHOR("Flaming19");
 WUPS_PLUGIN_LICENSE("GPL");
-
-#define STACK_SIZE 0x2000
-
-/**
-    All of these defines can be used in ANY file.
-    It's possible to split it up into multiple files.
-**/
 
 WUPS_USE_WUT_DEVOPTAB();           // Use the wut devoptabs
 WUPS_USE_STORAGE("rich_presence"); // Unique id for the storage api
@@ -57,6 +52,7 @@ void Broadcast(const std::string& json) {
 // Main background loop to broadcast current info
 void GameLoop(std::stop_token stoken) {
     int ctrls;
+    std::string details;
     std::string nnid;
     std::string json;
 
@@ -77,14 +73,19 @@ void GameLoop(std::stop_token stoken) {
             // Get Network ID
             nnid = configNetId ? GetNetworkId() : "";
 
+            if (ReplaceSlashN(GetXmlTag("longname_en")) == "Super Smash Bros. for Wii U") {
+                details = std::to_string(ReadFromMemory(0x1098B2AB)>>24) + " | " + std::to_string(ReadFromMemory(0x1098EDEB)>>24);
+                // details = DecToHex(ReadFromMemory(0x1098B2AB)>>24) + " | " + DecToHex(ReadFromMemory(0x1098EDEB)>>24);
+            }
+
             // Prepare and send json
-            json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetAppTitle(ENGLISH, true)) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + (configSmallImg ? GetNetwork(INKAY_EXISTS, INKAY_CONFIG) : "") + "\",\"dst\":" + std::to_string(configDst) + ",\"compatibility\":" + std::to_string(COMPATIBLE_VERSION) + "}";
+            json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetAppTitle(ENGLISH, true)) + "\",\"app\":\"" + app + "\",\"details\":\"" + details + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + (configSmallImg ? GetNetwork(INKAY_EXISTS, INKAY_CONFIG) : "") + "\",\"dst\":" + std::to_string(configDst) + ",\"compatibility\":" + std::to_string(COMPATIBLE_VERSION) + "}";
             Broadcast(json);
         }
 
         // Five second interval
-        for (int i=0; i<1000 && !stoken.stop_requested() && configEnabled; i++) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        for (int i=0; i<5 && !stoken.stop_requested() && configEnabled; i++) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
     }
     return;

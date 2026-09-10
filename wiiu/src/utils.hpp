@@ -10,8 +10,6 @@
 
 #include <arpa/inet.h>
 
-#include <mocha/mocha.h>
-
 #include "consts.hpp"
 
 /**
