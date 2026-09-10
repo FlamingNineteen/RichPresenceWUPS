@@ -206,7 +206,7 @@ std::string GetNetwork(bool inkayExists, std::string inkayConfig) {
 }
 
 /**
- * Takes an unsigned 32 bit integer (u_int32_t)
+ * Takes an unsigned 32 bit integer (`u_int32_t`)
  * IP address and puts it into string format.
  * @param ip The integer IP address.
  * @return The IP address as a string.
@@ -216,4 +216,35 @@ std::string IpToString(u_int32_t ip) {
          + std::to_string((ip / (256*256)) % 256) + "."
          + std::to_string((ip / 256) % 256) + "."
          + std::to_string(ip % 256);
+}
+
+/**
+ * Gets a 32-bit integer from memory.
+ * Implementation taken from the Kernel Module.
+ * @param addr The 32-bit integer denoting the address.
+ * @return The 32-bit integer at the address.
+ */
+uint32_t ReadFromMemory(uint32_t addr) {
+    uint32_t result;
+	asm volatile (
+		"li 3,1\n"
+		"li 4,0\n"
+		"li 5,0\n"
+		"li 6,0\n"
+		"li 7,0\n"
+		"lis 8,1\n"
+		"mr 9,%1\n"
+		"li 0,0x3400\n"
+		"mr %0,1\n"
+		"sc\n"
+		"nop\n"
+		"mr 1,%0\n"
+		"mr %0,3\n"
+		:	"=r"(result)
+		:	"b"((void *) (addr))
+		:	"memory", "ctr", "lr", "0", "3", "4", "5", "6", "7", "8", "9", "10",
+			"11", "12"
+	);
+
+	return result;
 }
