@@ -10,6 +10,9 @@
 
 #include "consts.hpp"
 
+/**
+ * A configuration option.
+ */
 template <typename T>
 struct ConfigOption {
     std::string id; // Config ID
@@ -22,12 +25,64 @@ struct ConfigOption {
     }
 };
 
+/**
+ * Options for controller display.
+ */
+enum CtrlDisplay {
+    // Do not display controller count
+    NOCTRLCOUNT,
+    
+    // Display the controller count, excluding the Gamepad
+    CTRLCOUNTNODRC,
+    
+    // Display the total controller count
+    CTRLCOUNT,
+
+    // Display based on the `drc_use` tag in the game's `meta.xml`
+    CTRLCOUNTMETA
+};
+
+/**
+ * Options for display language.
+ */
+enum LangOptions {
+    ENGLISH,
+    JAPANESE,
+    FRENCH,
+    GERMAN,
+    ITALIAN,
+    SPANISH,
+    SIMP_CHINESE,
+    KOREAN,
+    DUTCH,
+    PORTUGUESE,
+    RUSSIAN,
+    TRAD_CHINESE
+};
+
+/**
+ * Options for network display
+ */
+enum NetDisplay {
+    // Do not display network ID
+    NONETDISPLAY,
+
+    // Display network ID if the game uses network accounts
+    NETDISPLAYMETA,
+
+    // Display network ID
+    NETDISPLAY
+};
+
+/**
+ * All config options defined as one structure.
+ */
 struct {
     ConfigOption<bool> enabled = 
     ConfigOption<bool>("enabled", true);
 
-    ConfigOption<bool> net_id = 
-    ConfigOption<bool>("netid", true);
+    ConfigOption<NetDisplay> net_id = 
+    ConfigOption<NetDisplay>("netid", NETDISPLAYMETA);
 
     ConfigOption<bool> small_img = 
     ConfigOption<bool>("smallimg", true);
@@ -35,8 +90,8 @@ struct {
     ConfigOption<int> timeset = 
     ConfigOption<int>("timeset", 0);
 
-    ConfigOption<CtrlOptions> ctrl = 
-    ConfigOption<CtrlOptions>("display", CTRLCOUNT);
+    ConfigOption<CtrlDisplay> ctrl = 
+    ConfigOption<CtrlDisplay>("display", CTRLCOUNTMETA);
 
     ConfigOption<bool> dst = 
     ConfigOption<bool>("dst", true);
@@ -66,10 +121,6 @@ struct {
 void boolItemChanged(ConfigItemBoolean *item, bool newValue) {
     if (std::string_view(config.enabled.id) == item->identifier) {
         config.enabled.value = newValue;
-    }
-    
-    if (std::string_view(config.net_id.id) == item->identifier) {
-        config.net_id.value = newValue;
     }
 
     if (std::string_view(config.small_img.id) == item->identifier) {
@@ -120,7 +171,11 @@ void ipAddressItemChanged(ConfigItemIPAddress *item, uint32_t newValue) {
 
 void multipleValueItemChanged(ConfigItemMultipleValues *item, uint32_t newValue) {
     if (std::string_view(config.ctrl.id) == item->identifier) {
-        config.ctrl.value = (CtrlOptions) newValue;
+        config.ctrl.value = (CtrlDisplay) newValue;
+    }
+
+    if (std::string_view(config.net_id.id) == item->identifier) {
+        config.net_id.value = (NetDisplay) newValue;
     }
 
     if (std::string_view(config.lang.id) == item->identifier) {
@@ -157,8 +212,9 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         
         // Controller count options
         constexpr WUPSConfigItemMultipleValues::ValuePair ctrlOptValues[] = {
-            {NODISPLAY, "none"},
+            {NOCTRLCOUNT, "none"},
             {CTRLCOUNTNODRC, "exclude Gamepad"},
+            {CTRLCOUNTMETA, "based on the current app"},
             {CTRLCOUNT, "all"}
         };
 
@@ -168,10 +224,18 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
                                                                     ctrlOptValues,
                                                                     multipleValueItemChanged));
         
-        // Network ID boolean
-        displayCat.add(WUPSConfigItemBoolean::Create(config.net_id.id, "Show Network ID",
-                                                    config.net_id.def, config.net_id.value,
-                                                    boolItemChanged));
+        // Network ID options
+        constexpr WUPSConfigItemMultipleValues::ValuePair netIdOptValues[] = {
+            {NONETDISPLAY, "never"},
+            {NETDISPLAYMETA, "on apps with online features"},
+            {NETDISPLAY, "always"}
+        };
+
+        // Network ID multiselect
+        displayCat.add(WUPSConfigItemMultipleValues::CreateFromValue(config.net_id.id, "Show network ID",
+                                                                    config.net_id.def, config.net_id.value,
+                                                                    netIdOptValues,
+                                                                    multipleValueItemChanged));
 
         // Small image boolean
         displayCat.add(WUPSConfigItemBoolean::Create(config.small_img.id, "Show currently used network",

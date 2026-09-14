@@ -106,13 +106,13 @@ std::string GetXmlTag(std::string tag) {
                 result = metaXml->shortname_zht;
             }
             else if (tag == "drc_use") {
-                result = metaXml->drc_use;
+                result = std::to_string(metaXml->drc_use);
             }
             else if (tag == "network_use") {
-                result = metaXml->network_use;
+                result = std::to_string(metaXml->network_use);
             }
             else if (tag == "online_account_use") {
-                result = metaXml->online_account_use;
+                result = std::to_string(metaXml->online_account_use);
             }
             else {
                 result.clear();

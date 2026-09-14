@@ -60,24 +60,42 @@ void GameLoop(std::stop_token stoken) {
         if (app != "") {
             // Get controller count
             switch (config.ctrl.value) {
+                case NOCTRLCOUNT:
+                    ctrls = -2;
+                    break;
                 case CTRLCOUNT:
                     ctrls = GetCtrlNum();
                     break;
                 case CTRLCOUNTNODRC:
                     ctrls = GetCtrlNum()-1;
                     break;
+                case CTRLCOUNTMETA:
+                    ctrls = std::stoi(GetXmlTag("drc_use")) > 1 ? 0 : GetCtrlNum() + std::stoi(GetXmlTag("drc_use")) - 1;
+                    break;
                 default:
                     ctrls = -2;
             }
 
             // Get Network ID
-            nnid = config.net_id.value ? GetNetworkId() : "";
+            switch (config.net_id.value) {
+                case NONETDISPLAY:
+                    nnid = "";
+                    break;
+                case NETDISPLAYMETA:
+                    nnid = std::stoi(GetXmlTag("online_account_use")) ? GetNetworkId() : "";
+                    break;
+                case NETDISPLAY:
+                    nnid = GetNetworkId();
+                    break;
+                default:
+                    nnid = "";
+            }
 
             if (ReplaceSlashN(GetXmlTag("longname_en")) == "Super Smash Bros. for Wii U") {
                 details = std::to_string(ReadFromMemory(0x1098B2AB)>>24) + " | " + std::to_string(ReadFromMemory(0x1098EDEB)>>24);
                 // details = DecToHex(ReadFromMemory(0x1098B2AB)>>24) + " | " + DecToHex(ReadFromMemory(0x1098EDEB)>>24);
             }
-
+            
             // Prepare and send json
             json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetAppTitle(ENGLISH, true)) + "\",\"app\":\"" + app + "\",\"details\":\"" + details + "\",\"time\":" + std::to_string(elapsed + (config.timeset.value * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + (config.small_img.value ? GetNetwork(INKAY_EXISTS, INKAY_CONFIG) : "") + "\",\"dst\":" + std::to_string(config.dst.value) + ",\"compatibility\":" + std::to_string(COMPATIBLE_VERSION) + "}";
             Broadcast(json);
