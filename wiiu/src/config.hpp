@@ -10,78 +10,86 @@
 
 #include "consts.hpp"
 
-// Set default values for config options
-#define CONFIG_ENABLED_DEFAULT_VALUE true
-#define CONFIG_NET_ID_DEFAULT_VALUE true
-#define CONFIG_SMALL_IMG_DEFAULT_VALUE true
-#define CONFIG_TIMESET_DEFAULT_VALUE 0
-#define CONFIG_CTRL_DEFAULT_VALUE CTRLCOUNT
-#define CONFIG_DST_DEFAULT_VALUE true
-#define CONFIG_TITLE_DEFAULT_VALUE false
-#define CONFIG_LANG_DEFAULT_VALUE ENGLISH
-#define CONFIG_IP_FILTER_DEFAULT_VALUE false
-#define CONFIG_IP_DEFAULT_VALUE (uint32_t) UINT32_MAX
-#define CONFIG_PORT_DEFAULT_VALUE 5005
-#define CONFIG_COD_DEFAULT_VALUE true
+template <typename T>
+struct ConfigOption {
+    std::string id; // Config ID
+    T def;          // Default value
+    T value;        // Value of the item
 
-// Set config IDs for config options
-#define CONFIG_ENABLED_CONFIG_ID "enabled"
-#define CONFIG_NET_ID_CONFIG_ID "netid"
-#define CONFIG_TIMESET_CONFIG_ID "timeset"
-#define CONFIG_CTRL_CONFIG_ID "display"
-#define CONFIG_SMALL_IMG_CONFIG_ID "smallimg"
-#define CONFIG_DST_CONFIG_ID "dst"
-#define CONFIG_TITLE_CONFIG_ID "title"
-#define CONFIG_LANG_CONFIG_ID "lang"
-#define CONFIG_IP_FILTER_CONFIG_ID "ipfilter"
-#define CONFIG_IP_CONFIG_ID "ip"
-#define CONFIG_PORT_CONFIG_ID "port"
-#define CONFIG_COD_CONFIG_ID "cod"
+    ConfigOption(const char *i, T d) {
+        id = std::string(i);
+        def = value = d;
+    }
+};
 
-// Create a variable for each config option
-bool configEnabled     = CONFIG_ENABLED_DEFAULT_VALUE;
-bool configNetId       = CONFIG_NET_ID_DEFAULT_VALUE;
-int configTimeset      = CONFIG_TIMESET_DEFAULT_VALUE;
-CtrlOptions configCtrl = CONFIG_CTRL_DEFAULT_VALUE;
-bool configSmallImg    = CONFIG_SMALL_IMG_DEFAULT_VALUE;
-bool configDst         = CONFIG_DST_DEFAULT_VALUE;
-bool configTitle       = CONFIG_TITLE_DEFAULT_VALUE;
-LangOptions configLang = CONFIG_LANG_DEFAULT_VALUE;
-bool configIpFilter    = CONFIG_IP_FILTER_DEFAULT_VALUE;
-uint32_t configIp      = CONFIG_IP_DEFAULT_VALUE;
-int configPort         = CONFIG_PORT_DEFAULT_VALUE;
-bool configCod         = CONFIG_COD_CONFIG_ID;
+struct {
+    ConfigOption<bool> enabled = 
+    ConfigOption<bool>("enabled", true);
+
+    ConfigOption<bool> net_id = 
+    ConfigOption<bool>("netid", true);
+
+    ConfigOption<bool> small_img = 
+    ConfigOption<bool>("smallimg", true);
+
+    ConfigOption<int> timeset = 
+    ConfigOption<int>("timeset", 0);
+
+    ConfigOption<CtrlOptions> ctrl = 
+    ConfigOption<CtrlOptions>("display", CTRLCOUNT);
+
+    ConfigOption<bool> dst = 
+    ConfigOption<bool>("dst", true);
+
+    ConfigOption<bool> title = 
+    ConfigOption<bool>("title", true);
+
+    ConfigOption<LangOptions> lang = 
+    ConfigOption<LangOptions>("lang", ENGLISH);
+
+    ConfigOption<bool> ip_filter = 
+    ConfigOption<bool>("ipfilter", false);
+
+    ConfigOption<uint32_t> ip = 
+    ConfigOption<uint32_t>("ip", UINT32_MAX);
+
+    ConfigOption<int> port = 
+    ConfigOption<int>("port", 5005);
+
+    ConfigOption<bool> cod = 
+    ConfigOption<bool>("cod", true);
+} config;
 
 /**
  * Callbacks that will be called if the config has been changed
  */
 void boolItemChanged(ConfigItemBoolean *item, bool newValue) {
-    if (std::string_view(CONFIG_ENABLED_CONFIG_ID) == item->identifier) {
-        configEnabled = newValue;
+    if (std::string_view(config.enabled.id) == item->identifier) {
+        config.enabled.value = newValue;
     }
     
-    if (std::string_view(CONFIG_NET_ID_CONFIG_ID) == item->identifier) {
-        configNetId = newValue;
+    if (std::string_view(config.net_id.id) == item->identifier) {
+        config.net_id.value = newValue;
     }
 
-    if (std::string_view(CONFIG_SMALL_IMG_CONFIG_ID) == item->identifier) {
-        configSmallImg = newValue;
+    if (std::string_view(config.small_img.id) == item->identifier) {
+        config.small_img.value = newValue;
     }
 
-    if (std::string_view(CONFIG_TITLE_CONFIG_ID) == item->identifier) {
-        configTitle = newValue;
+    if (std::string_view(config.title.id) == item->identifier) {
+        config.title.value = newValue;
     }
 
-    if (std::string_view(CONFIG_DST_CONFIG_ID) == item->identifier) {
-        configDst = newValue;
+    if (std::string_view(config.dst.id) == item->identifier) {
+        config.dst.value = newValue;
     }
 
-    if (std::string_view(CONFIG_IP_FILTER_CONFIG_ID) == item->identifier) {
-        configIpFilter = newValue;
+    if (std::string_view(config.ip_filter.id) == item->identifier) {
+        config.ip_filter.value = newValue;
     }
 
-    if (std::string_view(CONFIG_COD_CONFIG_ID) == item->identifier) {
-        configCod = newValue;
+    if (std::string_view(config.cod.id) == item->identifier) {
+        config.cod.value = newValue;
     }
 
     // If the value has changed, we store it in the storage.
@@ -89,12 +97,12 @@ void boolItemChanged(ConfigItemBoolean *item, bool newValue) {
 }
 
 void integerRangeItemChanged(ConfigItemIntegerRange *item, int newValue) {
-    if (std::string_view(CONFIG_TIMESET_CONFIG_ID) == item->identifier) {
-        configTimeset = newValue;
+    if (std::string_view(config.timeset.id) == item->identifier) {
+        config.timeset.value = newValue;
     }
 
-    if (std::string_view(CONFIG_PORT_CONFIG_ID) == item->identifier) {
-        configPort = newValue;
+    if (std::string_view(config.port.id) == item->identifier) {
+        config.port.value = newValue;
     }
 
     // If the value has changed, we store it in the storage.
@@ -102,8 +110,8 @@ void integerRangeItemChanged(ConfigItemIntegerRange *item, int newValue) {
 }
 
 void ipAddressItemChanged(ConfigItemIPAddress *item, uint32_t newValue) {
-    if (std::string_view(CONFIG_IP_CONFIG_ID) == item->identifier) {
-        configIp = newValue;
+    if (std::string_view(config.ip.id) == item->identifier) {
+        config.ip.value = newValue;
     }
 
     // If the value has changed, we store it in the storage.
@@ -111,12 +119,12 @@ void ipAddressItemChanged(ConfigItemIPAddress *item, uint32_t newValue) {
 }
 
 void multipleValueItemChanged(ConfigItemMultipleValues *item, uint32_t newValue) {
-    if (std::string_view(CONFIG_CTRL_CONFIG_ID) == item->identifier) {
-        configCtrl = (CtrlOptions) newValue;
+    if (std::string_view(config.ctrl.id) == item->identifier) {
+        config.ctrl.value = (CtrlOptions) newValue;
     }
 
-    if (std::string_view(CONFIG_LANG_CONFIG_ID) == item->identifier) {
-        configLang = (LangOptions) newValue;
+    if (std::string_view(config.lang.id) == item->identifier) {
+        config.lang.value = (LangOptions) newValue;
     }
 
     // If the value has changed, we store it in the storage.
@@ -143,8 +151,8 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         auto displayCat = WUPSConfigCategory::Create("Display");
 
         // Enable boolean
-        displayCat.add(WUPSConfigItemBoolean::Create(CONFIG_ENABLED_CONFIG_ID, "Enable rich presence updates",
-                                                    CONFIG_ENABLED_DEFAULT_VALUE, configEnabled,
+        displayCat.add(WUPSConfigItemBoolean::Create(config.enabled.id, "Enable rich presence updates",
+                                                    config.enabled.def, config.enabled.value,
                                                     boolItemChanged));
         
         // Controller count options
@@ -155,35 +163,35 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         };
 
         // Controller count multiselect
-        displayCat.add(WUPSConfigItemMultipleValues::CreateFromValue(CONFIG_CTRL_CONFIG_ID, "Show controller count",
-                                                                    CONFIG_CTRL_DEFAULT_VALUE, configCtrl,
+        displayCat.add(WUPSConfigItemMultipleValues::CreateFromValue(config.ctrl.id, "Show controller count",
+                                                                    config.ctrl.def, config.ctrl.value,
                                                                     ctrlOptValues,
                                                                     multipleValueItemChanged));
         
         // Network ID boolean
-        displayCat.add(WUPSConfigItemBoolean::Create(CONFIG_NET_ID_CONFIG_ID, "Show Network ID",
-                                                    CONFIG_NET_ID_DEFAULT_VALUE, configNetId,
+        displayCat.add(WUPSConfigItemBoolean::Create(config.net_id.id, "Show Network ID",
+                                                    config.net_id.def, config.net_id.value,
                                                     boolItemChanged));
 
         // Small image boolean
-        displayCat.add(WUPSConfigItemBoolean::Create(CONFIG_SMALL_IMG_CONFIG_ID, "Show currently used network",
-                                                    CONFIG_SMALL_IMG_DEFAULT_VALUE, configSmallImg,
+        displayCat.add(WUPSConfigItemBoolean::Create(config.small_img.id, "Show currently used network",
+                                                    config.small_img.def, config.small_img.value,
                                                     boolItemChanged));
 
         // Timeset integer range
-        displayCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_TIMESET_CONFIG_ID, "Offset \"elapsed time\" timezone for correct display",
-                                                         CONFIG_TIMESET_DEFAULT_VALUE, configTimeset,
+        displayCat.add(WUPSConfigItemIntegerRange::Create(config.timeset.id, "Offset \"elapsed time\" timezone for correct display",
+                                                         config.timeset.def, config.timeset.value,
                                                          -12, 12,
                                                          &integerRangeItemChanged));
         
         // Daylight savings time boolean
-        displayCat.add(WUPSConfigItemBoolean::Create(CONFIG_DST_CONFIG_ID, "Conform to Daylight Savings Time",
-                                                    CONFIG_DST_DEFAULT_VALUE, configDst,
+        displayCat.add(WUPSConfigItemBoolean::Create(config.dst.id, "Conform to Daylight Savings Time",
+                                                    config.dst.def, config.dst.value,
                                                     boolItemChanged));
 
         // Title boolean
-        displayCat.add(WUPSConfigItemBoolean::Create(CONFIG_TITLE_CONFIG_ID, "Display full title",
-                                                    CONFIG_TITLE_DEFAULT_VALUE, configTitle,
+        displayCat.add(WUPSConfigItemBoolean::Create(config.title.id, "Display full title",
+                                                    config.title.def, config.title.value,
                                                     boolItemChanged));
             
         // Primary language options
@@ -203,8 +211,8 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         };
         
         // Primary language multiselect
-        displayCat.add(WUPSConfigItemMultipleValues::CreateFromValue(CONFIG_LANG_CONFIG_ID, "Primary title display language",
-                                                                    CONFIG_LANG_DEFAULT_VALUE, configLang,
+        displayCat.add(WUPSConfigItemMultipleValues::CreateFromValue(config.lang.id, "Primary title display language",
+                                                                    config.lang.def, config.lang.value,
                                                                     langOptValues,
                                                                     multipleValueItemChanged));
 
@@ -214,24 +222,24 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         auto advCat = WUPSConfigCategory::Create("Advanced");
 
         // IP filter boolean
-        advCat.add(WUPSConfigItemBoolean::Create(CONFIG_IP_FILTER_CONFIG_ID, "Only send data to a specific IP address",
-                                                CONFIG_IP_FILTER_DEFAULT_VALUE, configIpFilter,
+        advCat.add(WUPSConfigItemBoolean::Create(config.ip_filter.id, "Only send data to a specific IP address",
+                                                config.ip_filter.def, config.ip_filter.value,
                                                 &boolItemChanged));
 
         // Sender ip address selection
-        advCat.add(WUPSConfigItemIPAddress::Create(CONFIG_IP_CONFIG_ID, "IP address to send data to",
-                                                    CONFIG_IP_DEFAULT_VALUE, configIp,
+        advCat.add(WUPSConfigItemIPAddress::Create(config.ip.id, "IP address to send data to",
+                                                    config.ip.def, config.ip.value,
                                                     &ipAddressItemChanged));
 
         // Port integer range
-        advCat.add(WUPSConfigItemIntegerRange::Create(CONFIG_PORT_CONFIG_ID, "UDP port (default 5005)",
-                                                         CONFIG_PORT_DEFAULT_VALUE, configPort,
+        advCat.add(WUPSConfigItemIntegerRange::Create(config.port.id, "UDP port (default 5005)",
+                                                         config.port.def, config.port.value,
                                                          0, 65535,
                                                          &integerRangeItemChanged));
 
         // Call of Duty patch boolean
-        advCat.add(WUPSConfigItemBoolean::Create(CONFIG_COD_CONFIG_ID, "Prevent Call of Duty crashes",
-                                                    CONFIG_COD_DEFAULT_VALUE, configCod,
+        advCat.add(WUPSConfigItemBoolean::Create(config.cod.id, "Prevent Call of Duty crashes",
+                                                    config.cod.def, config.cod.value,
                                                     boolItemChanged));
 
         /* 
