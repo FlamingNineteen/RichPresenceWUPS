@@ -39,71 +39,80 @@ std::string GetXmlTag(std::string tag) {
     auto *metaXml = (ACPMetaXml *) memalign(0x40, sizeof(ACPMetaXml));
     if (metaXml) {
         if (ACPGetTitleMetaXml(OSGetTitleID(), metaXml) == ACP_RESULT_SUCCESS) {
-            if (tag ==  "longname_en") {
+            if (tag == "longname_en") {
                 result = metaXml->longname_en;
             }
-            else if (tag ==  "shortname_en") {
+            else if (tag == "shortname_en") {
                 result = metaXml->shortname_en;
             }
-            else if (tag ==  "longname_ja") {
+            else if (tag == "longname_ja") {
                 result = metaXml->longname_ja;
             }
-            else if (tag ==  "shortname_ja") {
+            else if (tag == "shortname_ja") {
                 result = metaXml->shortname_ja;
             }
-            else if (tag ==  "longname_fr") {
+            else if (tag == "longname_fr") {
                 result = metaXml->longname_fr;
             }
-            else if (tag ==  "shortname_fr") {
+            else if (tag == "shortname_fr") {
                 result = metaXml->shortname_fr;
             }
-            else if (tag ==  "longname_de") {
+            else if (tag == "longname_de") {
                 result = metaXml->longname_de;
             }
-            else if (tag ==  "shortname_de") {
+            else if (tag == "shortname_de") {
                 result = metaXml->shortname_de;
             }
-            else if (tag ==  "longname_it") {
+            else if (tag == "longname_it") {
                 result = metaXml->longname_it;
             }
-            else if (tag ==  "shortname_it") {
+            else if (tag == "shortname_it") {
                 result = metaXml->shortname_it;
             }
-            else if (tag ==  "longname_es") {
+            else if (tag == "longname_es") {
                 result = metaXml->longname_es;
             }
-            else if (tag ==  "shortname_es") {
+            else if (tag == "shortname_es") {
                 result = metaXml->shortname_es;
             }
-            else if (tag ==  "longname_zhs") {
+            else if (tag == "longname_zhs") {
                 result = metaXml->longname_zhs;
             }
-            else if (tag ==  "shortname_zhs") {
+            else if (tag == "shortname_zhs") {
                 result = metaXml->shortname_zhs;
             }
-            else if (tag ==  "longname_ko") {
+            else if (tag == "longname_ko") {
                 result = metaXml->longname_ko;
             }
-            else if (tag ==  "shortname_ko") {
+            else if (tag == "shortname_ko") {
                 result = metaXml->shortname_ko;
             }
-            else if (tag ==  "longname_nl") {
+            else if (tag == "longname_nl") {
                 result = metaXml->longname_nl;
             }
-            else if (tag ==  "shortname_nl") {
+            else if (tag == "shortname_nl") {
                 result = metaXml->shortname_nl;
             }
-            else if (tag ==  "longname_pt") {
+            else if (tag == "longname_pt") {
                 result = metaXml->longname_pt;
             }
-            else if (tag ==  "shortname_ru") {
+            else if (tag == "shortname_ru") {
                 result = metaXml->shortname_ru;
             }
-            else if (tag ==  "longname_zht") {
+            else if (tag == "longname_zht") {
                 result = metaXml->longname_zht;
             }
-            else if (tag ==  "shortname_zht") {
+            else if (tag == "shortname_zht") {
                 result = metaXml->shortname_zht;
+            }
+            else if (tag == "drc_use") {
+                result = metaXml->drc_use;
+            }
+            else if (tag == "network_use") {
+                result = metaXml->network_use;
+            }
+            else if (tag == "online_account_use") {
+                result = metaXml->online_account_use;
             }
             else {
                 result.clear();
