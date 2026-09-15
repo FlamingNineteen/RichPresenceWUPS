@@ -1,12 +1,10 @@
-#include "common.hpp"
-#include <iostream>
-
 #include <curl/curl.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <unistd.h>
 
-#include "json.hpp"
+#include "../common.hpp"
+#include "../json.hpp"
 using json = nlohmann::json;
 
 #ifdef __linux__

@@ -1,8 +1,3 @@
-#include <string>
-#include <vector>
-
-#include "common.hpp"
-
 #define _CRT_SECURE_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #pragma comment(lib, "ws2_32.lib")
@@ -11,6 +6,7 @@
 #include <ws2tcpip.h>
 #include <winhttp.h>
 
+#include "../common.hpp"
 #include "json.hpp"
 using json = nlohmann::json;
 

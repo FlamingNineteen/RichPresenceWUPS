@@ -1,9 +1,9 @@
 #include <thread>
 
 #if defined(__linux__) || defined(__APPLE__)
-	#include "unix.hpp"
+	#include "unix/unix.hpp"
 #elif _WIN32
-    #include "win.hpp"
+    #include "win/win.hpp"
 #endif
 
 std::string repo = "flamingnineteen/richpresencewups-db";
