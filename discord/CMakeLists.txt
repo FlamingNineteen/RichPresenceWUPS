@@ -6,16 +6,11 @@ set(CMAKE_CXX_STANDARD 23)
 add_subdirectory(discord-presence)
 
 if (WIN32 OR MINGW)
-  add_executable(WiiURichPresence src/main.cpp src/resource.rc)
+  add_executable(WiiURichPresence WIN32 src/main.cpp src/resource.rc)
 else()
   add_executable(WiiURichPresence src/main.cpp)
-endif()
-
-if (MINGW)
   target_link_libraries(WiiURichPresence PRIVATE winhttp -static-libgcc -static-libstdc++)
 endif()
-
-target_include_directories(WiiURichPresence PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries(WiiURichPresence PRIVATE ${PROJECT_NAME} fmt)
 if (UNIX)
