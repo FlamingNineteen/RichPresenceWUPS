@@ -175,6 +175,31 @@ void SetConsole() {
     freopen_s(&dummy, "CONOUT$", "w", stderr);
 }
 
+bool GetStartupStatus() {
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        LRESULT res = RegQueryValueExW(hKey, L"WiiURichPresence", NULL, NULL, NULL, NULL);
+        RegCloseKey(hKey);
+        return (res == ERROR_SUCCESS);
+    }
+    return false;
+}
+
+void SetStartupStatus(bool enable) {
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_WRITE, &hKey) == ERROR_SUCCESS) {
+        if (enable) {
+            wchar_t path[MAX_PATH];
+            GetModuleFileNameW(NULL, path, MAX_PATH);
+            std::wstring quotedPath = L"\"" + std::wstring(path) + L"\"";
+            RegSetValueExW(hKey, L"WiiURichPresence", 0, REG_SZ, (const BYTE*)quotedPath.c_str(), (quotedPath.length() + 1) * sizeof(wchar_t));
+        } else {
+            RegDeleteValueW(hKey, L"WiiURichPresence");
+        }
+        RegCloseKey(hKey);
+    }
+}
+
 LRESULT CALLBACK WindowProc(HWND hwnd, unsigned int uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_TRAYICON:
@@ -184,7 +209,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, unsigned int uMsg, WPARAM wParam, LPARAM 
                 SetForegroundWindow(hwnd);
 
                 HMENU hMenu = CreatePopupMenu();
-                AppendMenuW(hMenu, MF_STRING, NULL, updateMsg > 1 ? L"Checking for updates..." : (updateMsg > 0 ? L"Update available" : L"No update required"));
+                AppendMenuW(hMenu, MF_STRING, NULL, (std::wstring(L"Wii U Rich Presence v") + std::to_wstring(VERSION).substr(0, 3)).c_str());
+                AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+                AppendMenuW(hMenu, MF_STRING | MF_DISABLED, NULL, updateMsg > 1 ? L"Checking for updates..." : (updateMsg > 0 ? L"Update available" : L"No update required"));
+                AppendMenuW(hMenu, GetStartupStatus() ? (MF_STRING | MF_CHECKED) : (MF_STRING | MF_UNCHECKED), ID_TRAY_STARTUP, L"Launch on Startup");
                 AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
                 AppendMenuW(hMenu, MF_STRING, ID_TRAY_QUIT, L"Quit Wii U Rich Presence");
 
@@ -193,7 +221,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, unsigned int uMsg, WPARAM wParam, LPARAM 
             }
             break;
         case WM_COMMAND:
-            if (LOWORD(wParam) == ID_TRAY_QUIT) {
+            if (LOWORD(wParam) == ID_TRAY_STARTUP) SetStartupStatus(!GetStartupStatus());
+            else if (LOWORD(wParam) == ID_TRAY_QUIT) {
                 Shell_NotifyIconW(NIM_DELETE, &nid);
 
                 discord::RPCManager::get().shutdown();
@@ -204,7 +233,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, unsigned int uMsg, WPARAM wParam, LPARAM 
         case WM_DESTROY:
             Shell_NotifyIconW(NIM_DELETE, &nid);
             PostQuitMessage(0);
-            break;
     }
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
