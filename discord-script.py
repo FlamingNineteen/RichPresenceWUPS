@@ -10,7 +10,7 @@ from datetime import datetime
 from pypresence import Presence
 from pypresence.types import ActivityType, StatusDisplayType
 
-VERSION = 2.2
+VERSION = 2.3
 APP_ID = "1353248127469228074"
 REPO = "raw.githubusercontent.com/flamingnineteen/richpresencewups-db/main"
 PORT = 5005
