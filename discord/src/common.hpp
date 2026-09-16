@@ -6,21 +6,21 @@
 #include "json.hpp"
 using json = nlohmann::json;
 
-constexpr auto APPLICATION_ID = "1353248127469228074";
-unsigned short UDP_PORT = 5005;
 std::atomic<bool> idle = false;
 std::atomic<bool> runIdleLoop = true;
 bool updateMsg = false;
 
 // Setup the Rich Presence manager and its events
-void discordSetup() {
+void discordSetup(std::string app_id) {
     discord::RPCManager::get()
-        .setClientID(APPLICATION_ID)
+        .setClientID(app_id)
         .onReady([](discord::User const& user) {
-            fmt::println("Discord: connected to user {}#{} - {}", user.username, user.discriminator, user.id);
+            fmt::println("Discord: connected to user {}#{}", user.username, user.discriminator);
+            // fmt::println("Discord: connected to user {}#{} - {}", user.username, user.discriminator, user.id);
         })
         .onDisconnected([](int errcode, std::string_view message) {
             fmt::println("Discord: disconnected with error code {} - {}", errcode, message);
+            discord::RPCManager::get().refresh();
         })
         .onErrored([](int errcode, std::string_view message) {
             fmt::println("Discord: error with code {} - {}", errcode, message);
@@ -39,7 +39,7 @@ void updatePresence(std::string repo, std::string game, std::string full, std::s
         .setState(nnid != "" ? "NID: " + nnid : "")
         .setDetails(details != "" ? details : "Playing on the Wii U")
         .setStartTimestamp(start)
-        .setLargeImageKey((jpg == "oh no it didn't work") ? "preview" : ("https://raw.githubusercontent.com/" + repo + "/main/icons/" + jpg))
+        .setLargeImageKey((jpg == "oh no it didn't work") ? "preview" : (repo + "/icons/" + jpg))
         .setLargeImageText(full)
         .setSmallImageKey(img == "backwards" ? "" : img)
         .setSmallImageText(img == "nn" ? "Using Nintendo Network" : "Using Pretendo Network")

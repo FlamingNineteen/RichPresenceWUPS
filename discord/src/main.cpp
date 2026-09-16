@@ -1,39 +1,6 @@
-#include <thread>
-
-#if defined(__linux__) || defined(__APPLE__)
-	#include "unix/unix.hpp"
-#elif _WIN32
-    #include "win/win.hpp"
-#endif
-
-std::string repo = "flamingnineteen/richpresencewups-db";
-std::thread tthread(checkIdle);
+#include "core.hpp"
 
 int main(int argc, char* argv[]) {
-    // Check for command line arguments
-    int i = 2;
-    while (i < argc) {
-        if (std::strcmp(argv[i - 1], "repo") == 0) {
-            repo = argv[i];
-            fmt::println("Using repository {}.", repo);
-        }
-        else if (std::strcmp(argv[i - 1], "port") == 0) {
-            UDP_PORT = std::stoi(argv[i]);
-            fmt::println("Using port {}.", UDP_PORT);
-        }
-        i+=2;
-    }
-    
-    discordSetup();
-    discord::RPCManager::get().initialize();
-
-    gameLoop(repo);
-
-    runIdleLoop = false;
-	if (tthread.joinable()) {
-		tthread.join();
-	}
-
-    discord::RPCManager::get().shutdown();
+    coreLogic(argc, argv);
     return 0;
 }

@@ -7,8 +7,6 @@
 #include <winhttp.h>
 
 #include "../common.hpp"
-#include "json.hpp"
-using json = nlohmann::json;
 
 // Change the recieved time elapsed to epoch
 time_t adjustEpochToUtc(time_t localEpoch, bool dst = false) {
@@ -81,7 +79,7 @@ std::string fetchRawHtml(std::string server, std::string path) {
 json getImageKeys(std::string repo) {
     json images;
 
-    std::string fetch = fetchRawHtml("raw.githubusercontent.com", "/" + repo + "/main/titles.json");
+    std::string fetch = fetchRawHtml(repo.substr(0, repo.find("/")), repo.substr(repo.find("/")) + "/titles.json");
 	try {
 		images = json::parse(fetch);
 		fmt::println("Successfully fetched titles.json!");
@@ -93,7 +91,7 @@ json getImageKeys(std::string repo) {
 }
 
 // Bind to a UDP socket
-bool bind(SOCKET &sock, unsigned short port = UDP_PORT) {
+bool bind(SOCKET &sock, uint16_t port = 5005) {
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         return false;
@@ -124,11 +122,11 @@ bool bind(SOCKET &sock, unsigned short port = UDP_PORT) {
 }
 
 // Main loop
-void gameLoop(std::string repo) {
+void gameLoop(std::string repo, uint16_t port) {
     // Bind the socket
 	std::string msg;
     SOCKET sock;
-    while(!bind(sock)) {
+    while(!bind(sock, port)) {
         std::this_thread::sleep_for(std::chrono::seconds(2));
     };
     fmt::println("Successfully binded to port");
