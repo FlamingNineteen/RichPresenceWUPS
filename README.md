@@ -1,6 +1,6 @@
 # Wii U Rich Presence Plugin
 
-This plugin uses UDP to communicate with an application on your computer to set Discord Rich Presence for the user. The activity is set based on the application currently being played, the time the application was loaded, and the amount of controllers connected.
+This plugin uses UDP to communicate with an application on your computer to set Discord Rich Presence for the user. The activity is set based on the application currently being played, the time the application was loaded, the amount of controllers connected and more.
 
 ## Installation
 
@@ -10,8 +10,8 @@ This plugin uses UDP to communicate with an application on your computer to set 
 
 1. Download both the `RichPresence.wps` plugin and the `WURP-Windows` executable from the [Releases page](https://github.com/FlamingNineteen/RichPresenceWUPS/releases).
 2. Copy `RichPresence.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
+    - Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
 3. Keep the executable on your computer.
-4. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
 </details>
 
 <details>
@@ -20,8 +20,8 @@ This plugin uses UDP to communicate with an application on your computer to set 
 
 1. Download both the `RichPresence.wps` plugin and the `WURP-macOS` binary from the [Releases page](https://github.com/FlamingNineteen/RichPresenceWUPS/releases).
 2. Copy `RichPresence.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
+    - Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
 3. Keep the binary on your computer.
-4. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
 </details>
 
 <details>
@@ -30,8 +30,8 @@ This plugin uses UDP to communicate with an application on your computer to set 
 
 1. Download both the `RichPresence.wps` plugin and the `WURP-Linux` binary from the [Releases page](https://github.com/FlamingNineteen/RichPresenceWUPS/releases).
 2. Copy `RichPresence.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
+    - Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
 3. Keep the binary on your computer.
-4. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
 
 **If you are using a systemd-based system and would like to have the application run on startup, follow these next steps:**
 
@@ -52,9 +52,9 @@ git clone https://github.com/cmyksoda/RichPresenceWUPS.git
 
 1. Download the `RichPresence.wps` plugin from the [Releases page](https://github.com/FlamingNineteen/RichPresenceWUPS/releases).
 2. Copy `RichPresence.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
-3. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
-4. Download the `discord-script.py` file from the [repository](https://github.com/FlamingNineteen/RichPresenceWUPS/blob/main/discord-script.py).
-5. Make sure that [`pypresence`](https://github.com/qwertyquerty/pypresence) and `requests` are installed by running the following command:
+    - Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
+3. Download the `discord-script.py` file from the [repository](https://github.com/FlamingNineteen/RichPresenceWUPS/blob/main/discord-script.py).
+4. Make sure that [`pypresence`](https://github.com/qwertyquerty/pypresence) and `requests` are installed by running the following command:
 ```bash
 pip install requests pypresence
 ```
@@ -65,6 +65,8 @@ pip install requests pypresence
 
 ## Usage
 Start your Wii U with the environment you placed the plugin in, and run the executable, binary, or Python file with the Discord app open.
+
+You can enter the plugin's configuration settings to change the way presence is displayed.
 
 Additionally, you can specify command-line arguments for advanced customization:
 - `-a, --app-id <APPLICATION ID>`: Set the application ID of the Discord app to connect to.
