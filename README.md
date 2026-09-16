@@ -67,9 +67,10 @@ pip install requests pypresence
 Start your Wii U with the environment you placed the plugin in, and run the executable, binary, or Python file with the Discord app open.
 
 Additionally, you can specify command-line arguments for advanced customization:
-- `--repo <DOMAIN/PATH>`: Set the link to the image repository. Omit http(s):// in the link, or the fetch will fail.
-- `--app-id <APPLICATION ID>`: Set the application ID of the Discord app to connect to.
-- `--port <PORT>`: Set the UDP port number. Make sure the port matches the one set in the plugin's configuration settings.
+- `-a, --app-id <APPLICATION ID>`: Set the application ID of the Discord app to connect to.
+- `-p, --port <PORT>`: Set the UDP port number. Make sure the port matches the one set in the plugin's configuration settings.
+- `-r, --repo <DOMAIN/PATH>`: Set the link to the image repository. Omit http(s):// in the link, or the fetch will fail.
+- `-w, --windows-logs`: Create a window to show logs on Windows.
 
 ## Contribute
 The plugin might be missing images from a few Wii U games. If you are interested in adding game images, and have a Github account, check out the [image repository](https://github.com/flamingnineteen/RichPresenceWUPS-DB) for this plugin.

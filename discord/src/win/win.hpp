@@ -1,7 +1,9 @@
-#define _CRT_SECURE_NO_WARNINGS
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "winhttp.lib")
+
+#define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <winhttp.h>
@@ -14,13 +16,7 @@ time_t adjustEpochToUtc(time_t localEpoch, bool dst = false) {
     DWORD result = GetTimeZoneInformation(&tzInfo);
 
     // Get either standard time bias or daylight savings time bias
-    int bias = 0;
-    if (dst) {
-        bias = tzInfo.Bias - 60;
-    }
-    else {
-        bias = tzInfo.Bias;
-    }
+    int bias = tzInfo.Bias - dst * 60;
 
     // Convert bias from minutes to seconds and adjust the Epoch time
     time_t utcEpoch = localEpoch + (bias * 60);
@@ -161,4 +157,12 @@ void gameLoop(std::string repo, uint16_t port) {
     WSACleanup();
 
     return;
+}
+
+
+void SetConsole() {
+    AllocConsole();
+    FILE* dummy;
+    freopen_s(&dummy, "CONOUT$", "w", stdout);
+    freopen_s(&dummy, "CONOUT$", "w", stderr);
 }

@@ -39,7 +39,7 @@ void updatePresence(std::string repo, std::string game, std::string full, std::s
         .setState(nnid != "" ? "NID: " + nnid : "")
         .setDetails(details != "" ? details : "Playing on the Wii U")
         .setStartTimestamp(start)
-        .setLargeImageKey((jpg == "oh no it didn't work") ? "preview" : (repo + "/icons/" + jpg))
+        .setLargeImageKey((jpg == "oh no it didn't work") ? "preview" : ("http://" + repo + "/icons/" + jpg))
         .setLargeImageText(full)
         .setSmallImageKey(img == "backwards" ? "" : img)
         .setSmallImageText(img == "nn" ? "Using Nintendo Network" : "Using Pretendo Network")

@@ -6,24 +6,30 @@
     #include "win/win.hpp"
 #endif
 
-void coreLogic(int argc, char* argv[]) {
-    std::thread tthread(checkIdle);
+struct Config {
+    // The image repository. Do not include https:// or http:// at the beginning of string.
+    std::string repo = "raw.githubusercontent.com/flamingnineteen/richpresencewups-db/main";
+    
+    // The application ID of the Discord app to connect to.
+    std::string app_id = "1353248127469228074";
 
-    struct {
-        // The image repository. Do not include https:// or http:// at the beginning of string.
-        std::string repo = "raw.githubusercontent.com/flamingnineteen/richpresencewups-db/main";
-        
-        // The application ID of the Discord app to connect to.
-        std::string app_id = "1353248127469228074";
+    // The port to bind to.
+    uint16_t port = 5005;
 
-        // The port to bind to.
-        uint16_t port = 5005;
-    } config;
+    // Whether to show logs on Windows or not
+    bool winlogs = false;
+};
+
+Config cmdLineArgs(int argc, char* argv[]) {
+    Config config = Config();
 
     // Check for command line arguments
-    int i = 1;
-    while (i < argc) {
-        if (i + 1 < argc) {
+    for (int i = 1; i < argc; i++) {
+        if (std::strcmp(argv[i], "--windows-logs") == 0 || std::strcmp(argv[i], "-w") == 0) {
+            config.winlogs = true;
+            fmt::println("Enabling Windows logging", config.winlogs);
+        }
+        else if (i + 1 < argc) {
             if (std::strcmp(argv[i], "--repo") == 0 || std::strcmp(argv[i], "-r") == 0) {
                 config.repo = argv[i+1];
                 fmt::println("Using repository {}", config.repo);
@@ -37,11 +43,16 @@ void coreLogic(int argc, char* argv[]) {
                 config.port = std::stoi(argv[i+1]);
                 fmt::println("Using port {}", config.port);
             }
-            i+=1;
+            i++;
         }
-        i+=1;
     }
-    
+
+    return config;
+}
+
+void coreLogic(Config config) {
+    std::thread tthread(checkIdle);
+
     discordSetup(config.app_id);
     discord::RPCManager::get().initialize();
 
