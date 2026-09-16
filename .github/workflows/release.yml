@@ -1,0 +1,65 @@
+name: Build on release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          cd wiiu
+          docker build . -t builder
+          docker run --rm -v ${PWD}:/project builder make
+      
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: RichPresence.wps
+          path: ./wiiu/*.wps
+  build-client:
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: Windows
+            os: windows-latest
+            cmd: --config Release
+            path: /Release
+            ext: .exe
+
+          - name: macOS
+            os: macos-latest
+
+          - name: Linux
+            os: ubuntu-latest
+
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure CMake
+        run: |
+          cd discord
+          mkdir build && cd build
+          cmake ..
+
+      - name: Build
+        run: cmake --build . ${{ matrix.config.cmd }}
+      
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: WURP-${{ matrix.config.name }}${{ matrix.config.ext }}
+          path: ./discord/build${{ matrix.config.path }}/WiiURichPresence*
