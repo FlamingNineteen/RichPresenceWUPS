@@ -52,9 +52,7 @@ void Broadcast(const std::string& json) {
 // Main background loop to broadcast current info
 void GameLoop(std::stop_token stoken) {
     int ctrls;
-    std::string details;
-    std::string nnid;
-    std::string json;
+    std::string details, nnid, network, json;
 
     while (!stoken.stop_requested() && config.enabled.value) {
         if (app != "") {
@@ -77,7 +75,7 @@ void GameLoop(std::stop_token stoken) {
             }
 
             // Get Network ID
-            switch (config.net_id.value) {
+            switch (config.small_img.value) {
                 case NONETDISPLAY:
                     nnid = "";
                     break;
@@ -91,13 +89,27 @@ void GameLoop(std::stop_token stoken) {
                     nnid = "";
             }
 
-            if (ReplaceSlashN(GetXmlTag("longname_en")) == "Super Smash Bros. for Wii U") {
-                details = std::to_string(ReadFromMemory(0x1098B2AB)>>24) + " | " + std::to_string(ReadFromMemory(0x1098EDEB)>>24);
-                // details = DecToHex(ReadFromMemory(0x1098B2AB)>>24) + " | " + DecToHex(ReadFromMemory(0x1098EDEB)>>24);
+            // Get currently used network
+            switch (config.small_img.value) {
+                case NONETDISPLAY:
+                    network = "";
+                    break;
+                case NETDISPLAYMETA:
+                    network = std::stoi(GetXmlTag("online_account_use")) ? GetNetwork(INKAY_EXISTS, INKAY_CONFIG) : "";
+                    break;
+                case NETDISPLAY:
+                    network = GetNetwork(INKAY_EXISTS, INKAY_CONFIG);
+                    break;
+                default:
+                    network = "";
             }
+
+            // if (ReplaceSlashN(GetXmlTag("longname_en")) == "Super Smash Bros. for Wii U") {
+            //     details = std::to_string(ReadFromMemory(0x1098B2AB)>>24) + " | " + std::to_string(ReadFromMemory(0x1098EDEB)>>24);
+            // }
             
             // Prepare and send json
-            json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetAppTitle(ENGLISH, true)) + "\",\"app\":\"" + app + "\",\"details\":\"" + details + "\",\"time\":" + std::to_string(elapsed + (config.timeset.value * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + (config.small_img.value ? GetNetwork(INKAY_EXISTS, INKAY_CONFIG) : "") + "\",\"dst\":" + std::to_string(config.dst.value) + ",\"compatibility\":" + std::to_string(COMPATIBLE_VERSION) + "}";
+            json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetAppTitle(ENGLISH, true)) + "\",\"app\":\"" + app + "\",\"details\":\"" + details + "\",\"time\":" + std::to_string(elapsed + (config.timeset.value * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + network + "\",\"dst\":" + std::to_string(config.dst.value) + ",\"compatibility\":" + std::to_string(COMPATIBLE_VERSION) + "}";
             Broadcast(json);
         }
 

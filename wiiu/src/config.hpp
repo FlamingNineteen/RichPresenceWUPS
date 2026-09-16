@@ -84,8 +84,8 @@ struct {
     ConfigOption<NetDisplay> net_id = 
     ConfigOption<NetDisplay>("netid", NETDISPLAYMETA);
 
-    ConfigOption<bool> small_img = 
-    ConfigOption<bool>("smallimg", true);
+    ConfigOption<NetDisplay> small_img = 
+    ConfigOption<NetDisplay>("smallimg", NETDISPLAYMETA);
 
     ConfigOption<int> timeset = 
     ConfigOption<int>("timeset", 0);
@@ -121,10 +121,6 @@ struct {
 void boolItemChanged(ConfigItemBoolean *item, bool newValue) {
     if (std::string_view(config.enabled.id) == item->identifier) {
         config.enabled.value = newValue;
-    }
-
-    if (std::string_view(config.small_img.id) == item->identifier) {
-        config.small_img.value = newValue;
     }
 
     if (std::string_view(config.title.id) == item->identifier) {
@@ -176,6 +172,10 @@ void multipleValueItemChanged(ConfigItemMultipleValues *item, uint32_t newValue)
 
     if (std::string_view(config.net_id.id) == item->identifier) {
         config.net_id.value = (NetDisplay) newValue;
+    }
+
+    if (std::string_view(config.small_img.id) == item->identifier) {
+        config.small_img.value = (NetDisplay) newValue;
     }
 
     if (std::string_view(config.lang.id) == item->identifier) {
@@ -237,10 +237,11 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
                                                                     netIdOptValues,
                                                                     multipleValueItemChanged));
 
-        // Small image boolean
-        displayCat.add(WUPSConfigItemBoolean::Create(config.small_img.id, "Show currently used network",
-                                                    config.small_img.def, config.small_img.value,
-                                                    boolItemChanged));
+        // Small image multiselect
+        displayCat.add(WUPSConfigItemMultipleValues::CreateFromValue(config.small_img.id, "Show currently used network",
+                                                                    config.small_img.def, config.small_img.value,
+                                                                    netIdOptValues,
+                                                                    multipleValueItemChanged));
 
         // Timeset integer range
         displayCat.add(WUPSConfigItemIntegerRange::Create(config.timeset.id, "Offset \"elapsed time\" timezone for correct display",

@@ -28,7 +28,7 @@ void discordSetup(std::string app_id) {
 }
 
 // Sets the Rich Presence
-void updatePresence(std::string repo, std::string game, std::string full, std::string nnid, int ctrls, std::string jpg, std::string img, time_t start, std::string details = "") {
+void updatePresence(std::string repo, std::string game, std::string full, std::string nnid, int ctrls, std::string jpg, std::string img, time_t start) {
     idle = false;
     auto& rpc = discord::RPCManager::get();
 
@@ -37,7 +37,7 @@ void updatePresence(std::string repo, std::string game, std::string full, std::s
         .setActivityType(discord::ActivityType::Game)
         .setStatusDisplayType(discord::StatusDisplayType::Name)
         .setState(nnid != "" ? "NID: " + nnid : "")
-        .setDetails(details != "" ? details : "Playing on the Wii U")
+        .setDetails("Playing on the Wii U")
         .setStartTimestamp(start)
         .setLargeImageKey((jpg == "oh no it didn't work") ? "preview" : ("http://" + repo + "/icons/" + jpg))
         .setLargeImageText(full)
@@ -102,7 +102,7 @@ short parseJsonAndUpdate(std::string msg, json images, std::string repo, time_t 
         
         // Update presence, but also make sure it's backwards compatible
         if (out.contains("dst")) { // Update 2.1
-            updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"], out["dst"] == 1), out.contains("details") ? out["details"] : "");
+            updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"], out["dst"] == 1));
         }
         else if (out.contains("img")) { // Update 2.0
             updatePresence(repo, out["app"], out["long"], out["nnid"], out["ctrls"], image, out["img"], adjustEpochToUtc(out["time"], false));
