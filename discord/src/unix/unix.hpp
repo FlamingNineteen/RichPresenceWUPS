@@ -1,13 +1,9 @@
-#include "common.hpp"
-#include <iostream>
-
 #include <curl/curl.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <unistd.h>
 
-#include "json.hpp"
-using json = nlohmann::json;
+#include "../common.hpp"
 
 #ifdef __linux__
 	#include <unistd.h>
@@ -60,7 +56,7 @@ std::string fetchRawHtml(std::string server, std::string path) {
 json getImageKeys(std::string repo) {
     json images;
 
-    std::string fetch = fetchRawHtml("raw.githubusercontent.com", "/" + repo + "/main/titles.json");
+    std::string fetch = fetchRawHtml(repo, "/titles.json");
 	try {
 		images = json::parse(fetch);
 		fmt::println("Successfully fetched titles.json!");
@@ -72,7 +68,7 @@ json getImageKeys(std::string repo) {
 }
 
 // Main loop
-void gameLoop(std::string repo) {
+void gameLoop(std::string repo, uint16_t port) {
 	std::string msg;
 	int sock;
 	struct sockaddr_in addr;
@@ -86,7 +82,7 @@ void gameLoop(std::string repo) {
 	memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces
-    addr.sin_port = htons(5005);      // Bind to port 5005
+    addr.sin_port = htons(port);      // Bind to port 5005
 
 	while (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         perror("bind failed");

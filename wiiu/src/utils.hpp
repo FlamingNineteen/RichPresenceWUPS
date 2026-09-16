@@ -10,8 +10,6 @@
 
 #include <arpa/inet.h>
 
-#include <mocha/mocha.h>
-
 #include "consts.hpp"
 
 /**
@@ -41,71 +39,80 @@ std::string GetXmlTag(std::string tag) {
     auto *metaXml = (ACPMetaXml *) memalign(0x40, sizeof(ACPMetaXml));
     if (metaXml) {
         if (ACPGetTitleMetaXml(OSGetTitleID(), metaXml) == ACP_RESULT_SUCCESS) {
-            if (tag ==  "longname_en") {
+            if (tag == "longname_en") {
                 result = metaXml->longname_en;
             }
-            else if (tag ==  "shortname_en") {
+            else if (tag == "shortname_en") {
                 result = metaXml->shortname_en;
             }
-            else if (tag ==  "longname_ja") {
+            else if (tag == "longname_ja") {
                 result = metaXml->longname_ja;
             }
-            else if (tag ==  "shortname_ja") {
+            else if (tag == "shortname_ja") {
                 result = metaXml->shortname_ja;
             }
-            else if (tag ==  "longname_fr") {
+            else if (tag == "longname_fr") {
                 result = metaXml->longname_fr;
             }
-            else if (tag ==  "shortname_fr") {
+            else if (tag == "shortname_fr") {
                 result = metaXml->shortname_fr;
             }
-            else if (tag ==  "longname_de") {
+            else if (tag == "longname_de") {
                 result = metaXml->longname_de;
             }
-            else if (tag ==  "shortname_de") {
+            else if (tag == "shortname_de") {
                 result = metaXml->shortname_de;
             }
-            else if (tag ==  "longname_it") {
+            else if (tag == "longname_it") {
                 result = metaXml->longname_it;
             }
-            else if (tag ==  "shortname_it") {
+            else if (tag == "shortname_it") {
                 result = metaXml->shortname_it;
             }
-            else if (tag ==  "longname_es") {
+            else if (tag == "longname_es") {
                 result = metaXml->longname_es;
             }
-            else if (tag ==  "shortname_es") {
+            else if (tag == "shortname_es") {
                 result = metaXml->shortname_es;
             }
-            else if (tag ==  "longname_zhs") {
+            else if (tag == "longname_zhs") {
                 result = metaXml->longname_zhs;
             }
-            else if (tag ==  "shortname_zhs") {
+            else if (tag == "shortname_zhs") {
                 result = metaXml->shortname_zhs;
             }
-            else if (tag ==  "longname_ko") {
+            else if (tag == "longname_ko") {
                 result = metaXml->longname_ko;
             }
-            else if (tag ==  "shortname_ko") {
+            else if (tag == "shortname_ko") {
                 result = metaXml->shortname_ko;
             }
-            else if (tag ==  "longname_nl") {
+            else if (tag == "longname_nl") {
                 result = metaXml->longname_nl;
             }
-            else if (tag ==  "shortname_nl") {
+            else if (tag == "shortname_nl") {
                 result = metaXml->shortname_nl;
             }
-            else if (tag ==  "longname_pt") {
+            else if (tag == "longname_pt") {
                 result = metaXml->longname_pt;
             }
-            else if (tag ==  "shortname_ru") {
+            else if (tag == "shortname_ru") {
                 result = metaXml->shortname_ru;
             }
-            else if (tag ==  "longname_zht") {
+            else if (tag == "longname_zht") {
                 result = metaXml->longname_zht;
             }
-            else if (tag ==  "shortname_zht") {
+            else if (tag == "shortname_zht") {
                 result = metaXml->shortname_zht;
+            }
+            else if (tag == "drc_use") {
+                result = std::to_string(metaXml->drc_use);
+            }
+            else if (tag == "network_use") {
+                result = std::to_string(metaXml->network_use);
+            }
+            else if (tag == "online_account_use") {
+                result = std::to_string(metaXml->online_account_use);
             }
             else {
                 result.clear();
@@ -206,14 +213,45 @@ std::string GetNetwork(bool inkayExists, std::string inkayConfig) {
 }
 
 /**
- * Takes an unsigned 32 bit integer (u_int32_t)
+ * Takes an unsigned 32 bit integer (`uint32_t`)
  * IP address and puts it into string format.
  * @param ip The integer IP address.
  * @return The IP address as a string.
  */
-std::string IpToString(u_int32_t ip) {
+std::string IpToString(uint32_t ip) {
     return std::to_string(ip / (256*256*256)) + "."
          + std::to_string((ip / (256*256)) % 256) + "."
          + std::to_string((ip / 256) % 256) + "."
          + std::to_string(ip % 256);
+}
+
+/**
+ * Gets a 32-bit integer from memory.
+ * Implementation taken from the Kernel Module.
+ * @param addr The 32-bit integer denoting the address.
+ * @return The 32-bit integer at the address.
+ */
+uint32_t ReadFromMemory(uint32_t addr) {
+    uint32_t result;
+	asm volatile (
+		"li 3,1\n"
+		"li 4,0\n"
+		"li 5,0\n"
+		"li 6,0\n"
+		"li 7,0\n"
+		"lis 8,1\n"
+		"mr 9,%1\n"
+		"li 0,0x3400\n"
+		"mr %0,1\n"
+		"sc\n"
+		"nop\n"
+		"mr 1,%0\n"
+		"mr %0,3\n"
+		:	"=r"(result)
+		:	"b"((void *) (addr))
+		:	"memory", "ctr", "lr", "0", "3", "4", "5", "6", "7", "8", "9", "10",
+			"11", "12"
+	);
+
+	return result;
 }

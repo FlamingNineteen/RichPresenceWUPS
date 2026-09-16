@@ -1,39 +1,47 @@
-#include <thread>
+#include "core.hpp"
 
-#if defined(__linux__) || defined(__APPLE__)
-	#include "unix.hpp"
-#elif _WIN32
-    #include "win.hpp"
-#endif
+#if _WIN32
+    int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+        Config config = cmdLineArgs(__argc, __argv);
 
-std::string repo = "flamingnineteen/richpresencewups-db";
-std::thread tthread(checkIdle);
+        if (config.winlogs) SetConsole();
 
-int main(int argc, char* argv[]) {
-    // Check for command line arguments
-    int i = 2;
-    while (i < argc) {
-        if (std::strcmp(argv[i - 1], "repo") == 0) {
-            repo = argv[i];
-            fmt::println("Using repository {}.", repo);
+        const wchar_t* CLASS_NAME = L"WURPTrayClass";
+        WNDCLASSW wc              = {};
+        wc.lpfnWndProc            = WindowProc;
+        wc.hInstance              = hInstance;
+        wc.lpszClassName          = CLASS_NAME;
+        RegisterClassW(&wc);
+
+        HWND hwnd = CreateWindowExW(0, CLASS_NAME, L"WURP Tray", 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, hInstance, NULL);
+
+        nid.cbSize           = sizeof(NOTIFYICONDATAW);
+        nid.hWnd             = hwnd;
+        nid.uID              = 1;
+        nid.uFlags           = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+        nid.uCallbackMessage = WM_TRAYICON;
+        nid.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(101));
+        wcscpy_s(nid.szTip, L"Wii U Rich Presence");
+        Shell_NotifyIconW(NIM_ADD, &nid);
+
+        std::thread worker([config]() {
+            coreLogic(config);
+            PostThreadMessageW(GetCurrentThreadId(), WM_QUIT, 0, 0);
+        });
+
+        MSG msg = {};
+        while (GetMessageW(&msg, NULL, 0, 0)) {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
         }
-        else if (std::strcmp(argv[i - 1], "port") == 0) {
-            UDP_PORT = std::stoi(argv[i]);
-            fmt::println("Using port {}.", UDP_PORT);
-        }
-        i+=2;
+
+        if (worker.joinable()) worker.join();
+
+        return 0;
     }
-    
-    discordSetup();
-    discord::RPCManager::get().initialize();
-
-    gameLoop(repo);
-
-    runIdleLoop = false;
-	if (tthread.joinable()) {
-		tthread.join();
-	}
-
-    discord::RPCManager::get().shutdown();
-    return 0;
-}
+#else
+    int main(int argc, char* argv[]) {
+        coreLogic(cmdLineArgs(argc, argv));
+        return 0;
+    }
+#endif

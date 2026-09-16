@@ -1,18 +1,22 @@
-#include <string>
-#include <vector>
-
-#include "common.hpp"
+#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "winhttp.lib")
 
 #define _CRT_SECURE_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
-#pragma comment(lib, "ws2_32.lib")
-#pragma comment(lib, "winhttp.lib")
+
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <winhttp.h>
+#include <shellapi.h>
 
-#include "json.hpp"
-using json = nlohmann::json;
+#include "../common.hpp"
+
+// Define for tray menu
+#define WM_TRAYICON (WM_USER + 1)
+#define ID_TRAY_QUIT 1001
+#define ID_TRAY_STARTUP 1002
+
+NOTIFYICONDATAW nid = {};
 
 // Change the recieved time elapsed to epoch
 time_t adjustEpochToUtc(time_t localEpoch, bool dst = false) {
@@ -20,13 +24,7 @@ time_t adjustEpochToUtc(time_t localEpoch, bool dst = false) {
     DWORD result = GetTimeZoneInformation(&tzInfo);
 
     // Get either standard time bias or daylight savings time bias
-    int bias = 0;
-    if (dst) {
-        bias = tzInfo.Bias - 60;
-    }
-    else {
-        bias = tzInfo.Bias;
-    }
+    int bias = tzInfo.Bias - dst * 60;
 
     // Convert bias from minutes to seconds and adjust the Epoch time
     time_t utcEpoch = localEpoch + (bias * 60);
@@ -85,7 +83,7 @@ std::string fetchRawHtml(std::string server, std::string path) {
 json getImageKeys(std::string repo) {
     json images;
 
-    std::string fetch = fetchRawHtml("raw.githubusercontent.com", "/" + repo + "/main/titles.json");
+    std::string fetch = fetchRawHtml(repo.substr(0, repo.find("/")), repo.substr(repo.find("/")) + "/titles.json");
 	try {
 		images = json::parse(fetch);
 		fmt::println("Successfully fetched titles.json!");
@@ -97,7 +95,7 @@ json getImageKeys(std::string repo) {
 }
 
 // Bind to a UDP socket
-bool bind(SOCKET &sock, unsigned short port = UDP_PORT) {
+bool bind(SOCKET &sock, uint16_t port = 5005) {
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         return false;
@@ -128,11 +126,11 @@ bool bind(SOCKET &sock, unsigned short port = UDP_PORT) {
 }
 
 // Main loop
-void gameLoop(std::string repo) {
+void gameLoop(std::string repo, uint16_t port) {
     // Bind the socket
 	std::string msg;
     SOCKET sock;
-    while(!bind(sock)) {
+    while(!bind(sock, port)) {
         std::this_thread::sleep_for(std::chrono::seconds(2));
     };
     fmt::println("Successfully binded to port");
@@ -167,4 +165,74 @@ void gameLoop(std::string repo) {
     WSACleanup();
 
     return;
+}
+
+
+void SetConsole() {
+    AllocConsole();
+    FILE* dummy;
+    freopen_s(&dummy, "CONOUT$", "w", stdout);
+    freopen_s(&dummy, "CONOUT$", "w", stderr);
+}
+
+bool GetStartupStatus() {
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        LRESULT res = RegQueryValueExW(hKey, L"WiiURichPresence", NULL, NULL, NULL, NULL);
+        RegCloseKey(hKey);
+        return (res == ERROR_SUCCESS);
+    }
+    return false;
+}
+
+void SetStartupStatus(bool enable) {
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_WRITE, &hKey) == ERROR_SUCCESS) {
+        if (enable) {
+            wchar_t path[MAX_PATH];
+            GetModuleFileNameW(NULL, path, MAX_PATH);
+            std::wstring quotedPath = L"\"" + std::wstring(path) + L"\"";
+            RegSetValueExW(hKey, L"WiiURichPresence", 0, REG_SZ, (const BYTE*)quotedPath.c_str(), (quotedPath.length() + 1) * sizeof(wchar_t));
+        } else {
+            RegDeleteValueW(hKey, L"WiiURichPresence");
+        }
+        RegCloseKey(hKey);
+    }
+}
+
+LRESULT CALLBACK WindowProc(HWND hwnd, unsigned int uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+        case WM_TRAYICON:
+            if (lParam == WM_RBUTTONUP) {
+                POINT cursor;
+                GetCursorPos(&cursor);
+                SetForegroundWindow(hwnd);
+
+                HMENU hMenu = CreatePopupMenu();
+                AppendMenuW(hMenu, MF_STRING, NULL, (std::wstring(L"Wii U Rich Presence v") + std::to_wstring(VERSION).substr(0, 3)).c_str());
+                AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+                AppendMenuW(hMenu, MF_STRING | MF_DISABLED, NULL, updateMsg > 1 ? L"Checking for updates..." : (updateMsg > 0 ? L"Update available" : L"No update required"));
+                AppendMenuW(hMenu, GetStartupStatus() ? (MF_STRING | MF_CHECKED) : (MF_STRING | MF_UNCHECKED), ID_TRAY_STARTUP, L"Launch on Startup");
+                AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+                AppendMenuW(hMenu, MF_STRING, ID_TRAY_QUIT, L"Quit Wii U Rich Presence");
+
+                TrackPopupMenu(hMenu, TPM_BOTTOMALIGN | TPM_RIGHTALIGN, cursor.x, cursor.y, 0, hwnd, NULL);
+                DestroyMenu(hMenu);
+            }
+            break;
+        case WM_COMMAND:
+            if (LOWORD(wParam) == ID_TRAY_STARTUP) SetStartupStatus(!GetStartupStatus());
+            else if (LOWORD(wParam) == ID_TRAY_QUIT) {
+                Shell_NotifyIconW(NIM_DELETE, &nid);
+
+                discord::RPCManager::get().shutdown();
+
+                std::exit(0);
+            }
+            break;
+        case WM_DESTROY:
+            Shell_NotifyIconW(NIM_DELETE, &nid);
+            PostQuitMessage(0);
+    }
+    return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }

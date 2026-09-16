@@ -4,6 +4,8 @@
 #include <string.h>
 #include <thread>
 
+#include <mocha/mocha.h>
+
 #include "config.hpp"
 #include "utils.hpp"
 
@@ -16,13 +18,6 @@ WUPS_PLUGIN_DESCRIPTION("Discord Rich Presence for the Wii U.");
 WUPS_PLUGIN_VERSION(VERSION);
 WUPS_PLUGIN_AUTHOR("Flaming19");
 WUPS_PLUGIN_LICENSE("GPL");
-
-#define STACK_SIZE 0x2000
-
-/**
-    All of these defines can be used in ANY file.
-    It's possible to split it up into multiple files.
-**/
 
 WUPS_USE_WUT_DEVOPTAB();           // Use the wut devoptabs
 WUPS_USE_STORAGE("rich_presence"); // Unique id for the storage api
@@ -46,9 +41,9 @@ void Broadcast(const std::string& json) {
 
     sockaddr_in dest {};
     dest.sin_family = AF_INET;
-    dest.sin_port = htons(configPort);
+    dest.sin_port = htons(config.port.value);
 
-    dest.sin_addr.s_addr = inet_addr(configIpFilter ? IpToString(configIp).c_str() : "255.255.255.255");
+    dest.sin_addr.s_addr = inet_addr(config.ip_filter.value ? IpToString(config.ip.value).c_str() : "255.255.255.255");
 
     sendto(sock, json.c_str(), json.size(), 0, reinterpret_cast<sockaddr*>(&dest), sizeof(dest));
     close(sock);
@@ -57,34 +52,70 @@ void Broadcast(const std::string& json) {
 // Main background loop to broadcast current info
 void GameLoop(std::stop_token stoken) {
     int ctrls;
-    std::string nnid;
-    std::string json;
+    std::string details, nnid, network, json;
 
-    while (!stoken.stop_requested() && configEnabled) {
+    while (!stoken.stop_requested() && config.enabled.value) {
         if (app != "") {
             // Get controller count
-            switch (configCtrl) {
+            switch (config.ctrl.value) {
+                case NOCTRLCOUNT:
+                    ctrls = -2;
+                    break;
                 case CTRLCOUNT:
                     ctrls = GetCtrlNum();
                     break;
                 case CTRLCOUNTNODRC:
                     ctrls = GetCtrlNum()-1;
                     break;
+                case CTRLCOUNTMETA:
+                    ctrls = std::stoi(GetXmlTag("drc_use")) > 1 ? 0 : GetCtrlNum() + std::stoi(GetXmlTag("drc_use")) - 1;
+                    break;
                 default:
                     ctrls = -2;
             }
 
             // Get Network ID
-            nnid = configNetId ? GetNetworkId() : "";
+            switch (config.small_img.value) {
+                case NONETDISPLAY:
+                    nnid = "";
+                    break;
+                case NETDISPLAYMETA:
+                    nnid = std::stoi(GetXmlTag("online_account_use")) ? GetNetworkId() : "";
+                    break;
+                case NETDISPLAY:
+                    nnid = GetNetworkId();
+                    break;
+                default:
+                    nnid = "";
+            }
 
+            // Get currently used network
+            switch (config.small_img.value) {
+                case NONETDISPLAY:
+                    network = "";
+                    break;
+                case NETDISPLAYMETA:
+                    network = std::stoi(GetXmlTag("online_account_use")) ? GetNetwork(INKAY_EXISTS, INKAY_CONFIG) : "";
+                    break;
+                case NETDISPLAY:
+                    network = GetNetwork(INKAY_EXISTS, INKAY_CONFIG);
+                    break;
+                default:
+                    network = "";
+            }
+
+            // if (ReplaceSlashN(GetXmlTag("longname_en")) == "Super Smash Bros. for Wii U") {
+            //     details = std::to_string(ReadFromMemory(0x1098B2AB)>>24) + " | " + std::to_string(ReadFromMemory(0x1098EDEB)>>24);
+            // }
+            
             // Prepare and send json
-            json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetAppTitle(ENGLISH, true)) + "\",\"app\":\"" + app + "\",\"time\":" + std::to_string(elapsed + (configTimeset * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + (configSmallImg ? GetNetwork(INKAY_EXISTS, INKAY_CONFIG) : "") + "\",\"dst\":" + std::to_string(configDst) + ",\"compatibility\":" + std::to_string(COMPATIBLE_VERSION) + "}";
+            json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetAppTitle(ENGLISH, true)) + "\",\"app\":\"" + app + "\",\"details\":\"" + details + "\",\"time\":" + std::to_string(elapsed + (config.timeset.value * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + network + "\",\"dst\":" + std::to_string(config.dst.value) + ",\"compatibility\":" + std::to_string(COMPATIBLE_VERSION) + "}";
             Broadcast(json);
         }
 
         // Five second interval
-        for (int i=0; i<1000 && !stoken.stop_requested() && configEnabled; i++) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        for (int i=0; i<5 && !stoken.stop_requested() && config.enabled.value; i++) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
     }
     return;
@@ -93,7 +124,7 @@ void GameLoop(std::stop_token stoken) {
 void ConfigMenuClosedCallback() {
     WUPSStorageAPI::SaveStorage();
 
-    app = GetXmlTag("shortname_en") == "Health and Safety Information" ? "Homebrew Application" : ReplaceSlashN(GetAppTitle(configLang, configTitle));
+    app = GetXmlTag("shortname_en") == "Health and Safety Information" ? "Homebrew Application" : ReplaceSlashN(GetAppTitle(config.lang.value, config.title.value));
     preapp = app;
 
     if (tthread.joinable()) {
@@ -101,7 +132,7 @@ void ConfigMenuClosedCallback() {
         tthread.join(); // Wait for thread to finish before starting a new one
     }
 
-    if ((configEnabled && !(configCod && app.find("Call of Duty") != std::string::npos))) {
+    if ((config.enabled.value && !(config.cod.value && app.find("Call of Duty") != std::string::npos))) {
         tthread = std::jthread(GameLoop);
     }
 }
@@ -111,18 +142,18 @@ INITIALIZE_PLUGIN() {
 
     WUPSConfigAPIOptionsV1 configOptions = {.name = "Rich Presence"};
     WUPSConfigAPI_Init(configOptions, ConfigMenuOpenedCallback, ConfigMenuClosedCallback);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_ENABLED_CONFIG_ID, configEnabled, CONFIG_ENABLED_DEFAULT_VALUE);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_NET_ID_CONFIG_ID, configNetId, CONFIG_NET_ID_DEFAULT_VALUE);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_TIMESET_CONFIG_ID, configTimeset, CONFIG_TIMESET_DEFAULT_VALUE);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_CTRL_CONFIG_ID, configCtrl, CONFIG_CTRL_DEFAULT_VALUE);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_SMALL_IMG_CONFIG_ID, configSmallImg, CONFIG_SMALL_IMG_DEFAULT_VALUE);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_DST_CONFIG_ID, configDst, CONFIG_DST_DEFAULT_VALUE);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_TITLE_CONFIG_ID, configTitle, CONFIG_TITLE_DEFAULT_VALUE);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_LANG_CONFIG_ID, configLang, CONFIG_LANG_DEFAULT_VALUE);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_IP_CONFIG_ID, configIp, CONFIG_IP_DEFAULT_VALUE);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_IP_FILTER_CONFIG_ID, configIpFilter, CONFIG_IP_FILTER_DEFAULT_VALUE);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_PORT_CONFIG_ID, configPort, CONFIG_PORT_DEFAULT_VALUE);
-    WUPSStorageAPI::GetOrStoreDefault(CONFIG_COD_CONFIG_ID, configCod, CONFIG_COD_DEFAULT_VALUE);
+    WUPSStorageAPI::GetOrStoreDefault(config.enabled.id, config.enabled.value, config.enabled.def);
+    WUPSStorageAPI::GetOrStoreDefault(config.net_id.id, config.net_id.value, config.net_id.def);
+    WUPSStorageAPI::GetOrStoreDefault(config.timeset.id, config.timeset.value, config.timeset.def);
+    WUPSStorageAPI::GetOrStoreDefault(config.ctrl.id, config.ctrl.value, config.ctrl.def);
+    WUPSStorageAPI::GetOrStoreDefault(config.small_img.id, config.small_img.value, config.small_img.def);
+    WUPSStorageAPI::GetOrStoreDefault(config.dst.id, config.dst.value, config.dst.def);
+    WUPSStorageAPI::GetOrStoreDefault(config.title.id, config.title.value, config.title.def);
+    WUPSStorageAPI::GetOrStoreDefault(config.lang.id, config.lang.value, config.lang.def);
+    WUPSStorageAPI::GetOrStoreDefault(config.ip.id, config.ip.value, config.ip.def);
+    WUPSStorageAPI::GetOrStoreDefault(config.ip_filter.id, config.ip_filter.value, config.ip_filter.def);
+    WUPSStorageAPI::GetOrStoreDefault(config.port.id, config.port.value, config.port.def);
+    WUPSStorageAPI::GetOrStoreDefault(config.cod.id, config.cod.value, config.cod.def);
     WUPSStorageAPI::SaveStorage();
 
     char environment_path_buffer[0x100];
@@ -132,7 +163,7 @@ INITIALIZE_PLUGIN() {
 }
 
 ON_APPLICATION_START() {
-    app = GetXmlTag("shortname_en") == "Health and Safety Information" ? "Homebrew Application" : ReplaceSlashN(GetAppTitle(configLang, configTitle)); 
+    app = GetXmlTag("shortname_en") == "Health and Safety Information" ? "Homebrew Application" : ReplaceSlashN(GetAppTitle(config.lang.value, config.title.value)); 
 
     if (app != preapp) elapsed = time(NULL); // Only update elapsed time if app changed
     preapp = app;
@@ -141,7 +172,7 @@ ON_APPLICATION_START() {
         tthread.request_stop();
         tthread.join(); // Wait for thread to finish before starting a new one
     }
-    if (configEnabled && !(configCod && app.find("Call of Duty") != std::string::npos)) tthread = std::jthread(GameLoop);
+    if (config.enabled.value && !(config.cod.value && app.find("Call of Duty") != std::string::npos)) tthread = std::jthread(GameLoop);
 }
 
 ON_APPLICATION_REQUESTS_EXIT() {    

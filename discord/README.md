@@ -15,7 +15,7 @@ cmake ..
 cmake --build .
 ```
 
-## Compiling for Windows on Linux using MingGW
+## Compiling for Windows on Linux using MinGW
 After cloning, run the following commands in this directory:
 ```bash
 mkdir build && cd build

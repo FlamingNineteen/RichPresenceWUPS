@@ -1,52 +1,20 @@
 /**
  * The version number of the plugin.
  */
-#define VERSION "v2.2"
+#define VERSION "v2.3"
 
 /**
  * The oldest version of the pc app that the plugin completely supports, as a double.
  * Specifically, this version of the pc app should be able to support all features
  * of the current version of the plugin.
  */
-#define COMPATIBLE_VERSION (double) 2.2
+#define COMPATIBLE_VERSION (double) 2.3
 
 #pragma once
 
 #include <string.h>
 
 #include <padscore/wpad.h>
-
-/**
- * Options for controller display.
- */
-enum CtrlOptions {
-    // Do not display controller count
-    NODISPLAY,
-    
-    // Display the controller count, excluding the Gamepad
-    CTRLCOUNTNODRC,
-    
-    // Display the total controller count
-    CTRLCOUNT
-};
-
-/**
- * Options for display language.
- */
-enum LangOptions {
-    ENGLISH,
-    JAPANESE,
-    FRENCH,
-    GERMAN,
-    ITALIAN,
-    SPANISH,
-    SIMP_CHINESE,
-    KOREAN,
-    DUTCH,
-    PORTUGUESE,
-    RUSSIAN,
-    TRAD_CHINESE
-};
 
 /**
  * An array of all seven WPAD channels.
