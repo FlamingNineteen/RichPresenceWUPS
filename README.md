@@ -72,6 +72,7 @@ Additionally, you can specify command-line arguments for advanced customization:
 - `-a, --app-id <APPLICATION ID>`: Set the application ID of the Discord app to connect to.
 - `-p, --port <PORT>`: Set the UDP port number. Make sure the port matches the one set in the plugin's configuration settings.
 - `-r, --repo <DOMAIN/PATH>`: Set the link to the image repository. Omit http(s):// in the link, or the fetch will fail.
+- `-v, --version`: Print the version number upon startup.
 - `-w, --windows-logs`: Create a window to show logs on Windows.
 
 ## Contribute

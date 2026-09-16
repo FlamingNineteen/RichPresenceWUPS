@@ -16,18 +16,22 @@ REPO = "raw.githubusercontent.com/flamingnineteen/richpresencewups-db/main"
 PORT = 5005
 
 # Check for command line arguments
-i = 2
+i=1
 while i < len(sys.argv):
-    if (sys.argv[i - 1] == ["-r", "--repo"]):
-        REPO = sys.argv[i]
-        print(f"Using repository {REPO}.")
-    if (sys.argv[i - 1] == ["-a", "--app-id"]):
-        APP_ID = sys.argv[i]
-        print(f"Using repository {APP_ID}.")
-    if (sys.argv[i - 1] ["p", "--port"]):
-        PORT = int(sys.argv[i])
-        print(f"Using port {PORT}.")
-    i+=2
+    if (sys.argv[i] in ["-v", "--version"]):
+        print(f"Wii U Rich Presence v{VERSION}")
+    elif i+1 < len(sys.argv):
+        i+=1
+        if (sys.argv[i-1] in ["-r", "--repo"]):
+            REPO = sys.argv[i]
+            print(f"Using repository {REPO}.")
+        elif (sys.argv[i-1] in ["-a", "--app-id"]):
+            APP_ID = sys.argv[i]
+            print(f"Using repository {APP_ID}.")
+        elif (sys.argv[i-1] in ["-p", "--port"]):
+            PORT = int(sys.argv[i])
+            print(f"Using port {PORT}.")
+    i+=1
 
 # Connect to Discord
 client = Presence(client_id = APP_ID)

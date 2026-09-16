@@ -27,7 +27,10 @@ Config cmdLineArgs(int argc, char* argv[]) {
     for (int i = 1; i < argc; i++) {
         if (std::strcmp(argv[i], "--windows-logs") == 0 || std::strcmp(argv[i], "-w") == 0) {
             config.winlogs = true;
-            fmt::println("Enabling Windows logging", config.winlogs);
+            fmt::println("Enabling Windows logging");
+        }
+        if (std::strcmp(argv[i], "--version") == 0 || std::strcmp(argv[i], "-v") == 0) {
+            fmt::println("Wii U Rich Presence v{}", VERSION);
         }
         else if (i + 1 < argc) {
             if (std::strcmp(argv[i], "--repo") == 0 || std::strcmp(argv[i], "-r") == 0) {
