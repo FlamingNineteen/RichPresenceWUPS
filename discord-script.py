@@ -12,16 +12,19 @@ from pypresence.types import ActivityType, StatusDisplayType
 
 VERSION = 2.2
 APP_ID = "1353248127469228074"
-REPO = "flamingnineteen/richpresencewups-db"
+REPO = "raw.githubusercontent.com/flamingnineteen/richpresencewups-db/main"
 PORT = 5005
 
 # Check for command line arguments
 i = 2
 while i < len(sys.argv):
-    if (sys.argv[i - 1] == "repo"):
+    if (sys.argv[i - 1] == ["-r", "--repo"]):
         REPO = sys.argv[i]
         print(f"Using repository {REPO}.")
-    if (sys.argv[i - 1] == "port"):
+    if (sys.argv[i - 1] == ["-a", "--app-id"]):
+        APP_ID = sys.argv[i]
+        print(f"Using repository {APP_ID}.")
+    if (sys.argv[i - 1] ["p", "--port"]):
         PORT = int(sys.argv[i])
         print(f"Using port {PORT}.")
     i+=2
@@ -53,7 +56,7 @@ while not binded:
 # Recieve Image URLs
 titles = {}
 try:
-    req = requests.get(f"https://raw.githubusercontent.com/{REPO}/main/titles.json")
+    req = requests.get(f"http://{REPO}/titles.json")
     titles = json.loads(req.text)
     print("Successfully fetched titles.json!")
 except:
@@ -99,16 +102,20 @@ async def main():
     while 1:
         # Wait for a message
         msg = await asyncio.to_thread(sock.recv, 1024)
-        data = parse(msg.decode())
-        print(f"Recieved: {data}")
-        idle = False
+        try:
+            data = parse(msg.decode())
+            print(f"Recieved: {data}")
+            idle = False
+        except:
+            print("Failed to parse message")
+            continue
 
         # Attempt to set Rich Presence
         try:
             if (data["sender"] == "Wii U"):
                 image = ""
                 try:
-                    image = f"https://raw.githubusercontent.com/{REPO}/main/icons/{titles[data["long"]]}"
+                    image = f"http://{REPO}/icons/{titles[data["long"]]}"
                 except:
                     image = "preview"
                 
@@ -127,7 +134,7 @@ async def main():
                     large_text=          data["long"],
                     small_image=         None if img == "" else img,
                     small_text=          f"Using {"Nintendo" if img == "nn" else "Pretendo"} Network",
-                    party_size=          [data["ctrls"] + 1 if data["ctrls"] > -2 else 0, 4 if data["ctrls"] < 4 else 8]
+                    party_size=          [data["ctrls"] + 1 if data["ctrls"] > -2 else 0, 4 if data["ctrls"] < 4 else 8],
                     instance=            False
                 )
 

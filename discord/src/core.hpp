@@ -36,7 +36,7 @@ Config cmdLineArgs(int argc, char* argv[]) {
             }
             else if (
                 std::strcmp(argv[i], "--app-id") == 0 || std::strcmp(argv[i], "-a") == 0) {
-                config.port = std::stoi(argv[i+1]);
+                config.app_id = argv[i+1];
                 fmt::println("Using application id {}", config.app_id);
             }
             else if (std::strcmp(argv[i], "--port") == 0 || std::strcmp(argv[i], "-p") == 0) {

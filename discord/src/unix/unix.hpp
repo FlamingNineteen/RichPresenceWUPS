@@ -56,7 +56,7 @@ std::string fetchRawHtml(std::string server, std::string path) {
 json getImageKeys(std::string repo) {
     json images;
 
-    std::string fetch = fetchRawHtml(repo + "/titles.json");
+    std::string fetch = fetchRawHtml(repo, "/titles.json");
 	try {
 		images = json::parse(fetch);
 		fmt::println("Successfully fetched titles.json!");
