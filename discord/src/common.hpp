@@ -8,7 +8,7 @@ using json = nlohmann::json;
 
 std::atomic<bool> idle = false;
 std::atomic<bool> runIdleLoop = true;
-bool updateMsg = false;
+uint8_t updateMsg = 2;
 
 // Setup the Rich Presence manager and its events
 void discordSetup(std::string app_id) {
@@ -112,11 +112,14 @@ short parseJsonAndUpdate(std::string msg, json images, std::string repo, time_t 
         }
 
         // Check for updates
-        if (out.contains("compatibility")) {
-            if ((out["compatibility"] > VERSION) && !updateMsg) {
+        if (out.contains("compatibility") && updateMsg > 1) {
+            if ((out["compatibility"] > VERSION)) {
                 double v = out["compatibility"];
                 fmt::println("A new update is available: v{}", v);
-                updateMsg = true;
+                updateMsg = 1;
+            }
+            else {
+                updateMsg = 0;
             }
         }
     }

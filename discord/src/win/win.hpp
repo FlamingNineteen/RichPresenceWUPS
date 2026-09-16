@@ -7,8 +7,16 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <winhttp.h>
+#include <shellapi.h>
 
 #include "../common.hpp"
+
+// Define for tray menu
+#define WM_TRAYICON (WM_USER + 1)
+#define ID_TRAY_QUIT 1001
+#define ID_TRAY_STARTUP 1002
+
+NOTIFYICONDATAW nid = {};
 
 // Change the recieved time elapsed to epoch
 time_t adjustEpochToUtc(time_t localEpoch, bool dst = false) {
@@ -165,4 +173,38 @@ void SetConsole() {
     FILE* dummy;
     freopen_s(&dummy, "CONOUT$", "w", stdout);
     freopen_s(&dummy, "CONOUT$", "w", stderr);
+}
+
+LRESULT CALLBACK WindowProc(HWND hwnd, unsigned int uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+        case WM_TRAYICON:
+            if (lParam == WM_RBUTTONUP) {
+                POINT cursor;
+                GetCursorPos(&cursor);
+                SetForegroundWindow(hwnd);
+
+                HMENU hMenu = CreatePopupMenu();
+                AppendMenuW(hMenu, MF_STRING, NULL, updateMsg > 1 ? L"Checking for updates..." : (updateMsg > 0 ? L"Update available" : L"No update required"));
+                AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+                AppendMenuW(hMenu, MF_STRING, ID_TRAY_QUIT, L"Quit Wii U Rich Presence");
+
+                TrackPopupMenu(hMenu, TPM_BOTTOMALIGN | TPM_RIGHTALIGN, cursor.x, cursor.y, 0, hwnd, NULL);
+                DestroyMenu(hMenu);
+            }
+            break;
+        case WM_COMMAND:
+            if (LOWORD(wParam) == ID_TRAY_QUIT) {
+                Shell_NotifyIconW(NIM_DELETE, &nid);
+
+                discord::RPCManager::get().shutdown();
+
+                std::exit(0);
+            }
+            break;
+        case WM_DESTROY:
+            Shell_NotifyIconW(NIM_DELETE, &nid);
+            PostQuitMessage(0);
+            break;
+    }
+    return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
