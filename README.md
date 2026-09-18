@@ -35,12 +35,13 @@ This plugin uses UDP to communicate with an application on your computer to set 
 
 **If you are using a systemd-based system and would like to have the application run on startup, follow these next steps:**
 
-5. Clone this repository using git.  
+5. Download the `install.sh` script from the [repository](https://github.com/FlamingNineteen/RichPresenceWUPS/blob/main/install.sh)
+6. make `install.sh` executable with this:
 ```bash
-git clone https://github.com/cmyksoda/RichPresenceWUPS.git
+chmod +x ./install.sh
 ```
-6. Place the `WURP-Linux` binary into the same directory as this repository.  
-7. Run the installation script (this installs the binary as a systemd user process)  
+7. Place the `WURP-Linux` binary into the same directory as `install.sh`.  
+8. Run the installation script (this installs the binary as a systemd user process)  
 ```bash
 ./install.sh
 ```
