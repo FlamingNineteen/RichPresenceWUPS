@@ -31,9 +31,10 @@ Restart=on-failure
 WantedBy=default.target
 EOF
 
-# enable service
+# enable and restart service (restarting ensures updates take effect)
 systemctl --user daemon-reload
-systemctl --user enable --now wurp.service
+systemctl --user enable wurp.service
+systemctl --user restart wurp.service
 
 # print installation message
 echo "WUPS Service Installed and Started Successfully!"
