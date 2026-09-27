@@ -54,10 +54,9 @@ Config cmdLineArgs(int argc, char* argv[]) {
 }
 
 void coreLogic(Config config) {
-    std::thread tthread(checkIdle);
-
     discordSetup(config.app_id);
     discord::RPCManager::get().initialize();
+    std::thread tthread(checkIdle);
 
     gameLoop(config.repo, config.port);
 

@@ -103,8 +103,7 @@ void gameLoop(std::string repo, uint16_t port) {
     	ssize_t bytes_received = recvfrom(sock, buffer, sizeof(buffer), 0, (struct sockaddr *)&addr, &addr_len);
     
 		if (bytes_received > 0) {
-			buffer[bytes_received] = '\0';
-			msg = buffer;
+			msg.assign(buffer, bytes_received);
 			
 			// Attempt to set Rich Presence
 			if (parseJsonAndUpdate(msg, images, repo, adjustEpochToUtc) < 0) {
