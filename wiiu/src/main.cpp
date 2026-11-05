@@ -36,8 +36,9 @@ std::string ENVIRONMENT_PATH;
 int protariumState = -1; // -1 not checked yet, 0 no, 1 yes
 
 /**
- * Whether the installed Inkay is Protarium's build. Like Prot-endo-Switcher,
- * this looks for "protarium" inside the Inkay plugin and module files.
+ * Whether this is a Protarium setup: the environment's name contains
+ * "protarium", or (like Prot-endo-Switcher) an Inkay plugin or module file
+ * contains "protarium".
  * Checked once, the first time it's needed.
  */
 bool FileContains(const std::string &path, const std::string &needle) {
@@ -61,6 +62,14 @@ bool FileContains(const std::string &path, const std::string &needle) {
 bool IsProtarium() {
     if (protariumState != -1) return protariumState == 1;
     protariumState = 0;
+
+    // An environment named after Protarium, e.g. "Aroma Protarium"
+    std::string env = ENVIRONMENT_PATH;
+    for (char &c : env) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    if (env.find("protarium") != std::string::npos) {
+        protariumState = 1;
+        return true;
+    }
     for (const char *folder : {"/plugins", "/modules"}) {
         std::error_code ec;
         for (const auto &entry : std::filesystem::directory_iterator(ENVIRONMENT_PATH + folder, ec)) {
