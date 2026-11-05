@@ -38,9 +38,6 @@ jobs:
             path: /Release
             ext: .exe
 
-          - name: macOS
-            os: macos-latest
-
           - name: Linux
             os: ubuntu-latest
 
@@ -57,9 +54,6 @@ jobs:
         if: matrix.config.name == 'Linux'
         run: sudo apt-get update && sudo apt-get install libcurl4-openssl-dev
       
-      - name: macOS Dependencies
-        if: matrix.config.name == 'macOS'
-        run: brew install curl
 
       - name: Build
         run: |

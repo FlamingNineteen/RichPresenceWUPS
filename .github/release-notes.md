@@ -18,4 +18,4 @@ This fork adds a **direct mode**: the plugin talks to Discord itself over HTTPS,
 
 > Headless sessions are not part of Discord's official public documentation, so Discord could change them in the future.
 
-The computer applications (`WURP-*`) are only needed for computer mode.
+The computer applications (`WURP-Windows.exe`, `WURP-Linux`) are only needed for computer mode.
