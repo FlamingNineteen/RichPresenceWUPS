@@ -231,6 +231,9 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
             static std::string statusLine;
             statusLine = DiscordDirect::StatusText();
             setupCat.add(WUPSConfigItemStub::Create(statusLine.c_str()));
+            static std::string iconLine;
+            iconLine = "Network icons: " + DiscordDirect::assetsInfo;
+            setupCat.add(WUPSConfigItemStub::Create(iconLine.c_str()));
             setupCat.add(WUPSConfigItemStub::Create("Direct mode needs the CURLWrapperModule and a token file"));
             setupCat.add(WUPSConfigItemStub::Create("made once with setup/discord_setup.py on a computer."));
         }

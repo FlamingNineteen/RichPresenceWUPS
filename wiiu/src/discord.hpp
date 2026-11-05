@@ -95,6 +95,8 @@ std::set<std::string> rejectedFields; // activity fields Discord refused, left o
 std::map<std::string, std::string> rejectedReasons;
 std::map<std::string, std::string> assetUrls; // art asset name -> image URL
 bool assetsLoaded = false;
+std::string assetsInfo = "not loaded";  // shown in the config menu
+int partyFormat = 0;                     // which party layout Discord accepts, see PartyJson
 long long blockedUntil = 0;           // Wii U local time until which Discord asked us to wait
 
 struct Response {
@@ -334,12 +336,13 @@ std::string IconUrl(const std::string &longName) {
  * Reads the art assets of an application (a public endpoint) so they can be
  * used as image URLs.
  */
-void LoadAssetsOf(const std::string &appId) {
-    Response r = Request(API + "/oauth2/applications/" + appId + "/assets");
-    if (!r.ok || r.status != 200) return;
+int LoadAssetsOf(const std::string &appId) {
+    Response r = Request(API + "/oauth2/applications/" + appId + "/assets", "", "", tokens.accessToken);
+    if (!r.ok) return -1;
+    if (r.status != 200) return static_cast<int>(r.status);
     try {
         json list = json::parse(r.body);
-        if (!list.is_array()) return;
+        if (!list.is_array()) return -2;
         for (const json &asset : list) {
             std::string name = asset.value("name", std::string());
             std::string id   = asset.value("id", std::string());
@@ -348,14 +351,40 @@ void LoadAssetsOf(const std::string &appId) {
                 assetUrls[name] = "https://cdn.discordapp.com/app-assets/" + appId + "/" + id + ".png";
             }
         }
-        assetsLoaded = true;
+        return 200;
     } catch (...) {
+        return -2;
     }
 }
 
+/**
+ * Loads the art assets once per boot. The result is shown in the menu, so a
+ * missing icon can be explained.
+ */
 void LoadAssets() {
-    if (!tokens.clientId.empty()) LoadAssetsOf(tokens.clientId);
-    LoadAssetsOf(ORIGINAL_APP_ID);
+    int own      = tokens.clientId.empty() ? 0 : LoadAssetsOf(tokens.clientId);
+    int original = LoadAssetsOf(ORIGINAL_APP_ID);
+    assetsLoaded = true;
+
+    std::string found = assetUrls.count("nn") && assetUrls.count("pn") ? "found" : "missing";
+    assetsInfo        = found + " (your app " + std::to_string(own) + ", original " + std::to_string(original) + ")";
+}
+
+/**
+ * Discord documents the party size as [current, max], but headless sessions
+ * answer "Expected an object". The layouts are tried in order and the first
+ * one Discord accepts is kept.
+ */
+constexpr int PARTY_FORMATS = 3;
+json PartyJson(int size, int max) {
+    switch (partyFormat) {
+        case 0:
+            return {{"id", "wiiu"}, {"size", {{"current_size", size}, {"max_size", max}}}};
+        case 1:
+            return {{"id", "wiiu"}, {"current_size", size}, {"max_size", max}};
+        default:
+            return {{"id", "wiiu"}, {"size", {{"current", size}, {"max", max}}}};
+    }
 }
 
 std::string AssetUrl(const std::string &name) {
@@ -383,9 +412,12 @@ json BuildActivity(const Presence &p) {
 
     // Nintendo Network / Pretendo icon, from the art assets "nn" and "pn"
     if (!p.network.empty()) {
-        std::string url                   = AssetUrl(p.network);
-        activity["assets"]["small_image"] = url.empty() ? p.network : url;
-        activity["assets"]["small_text"]  = p.network == "nn" ? "Using Nintendo Network" : "Using Pretendo Network";
+        // Without an image Discord would show a "?", so leave it out then
+        std::string url = AssetUrl(p.network);
+        if (!url.empty()) {
+            activity["assets"]["small_image"] = url;
+            activity["assets"]["small_text"]  = p.network == "nn" ? "Using Nintendo Network" : "Using Pretendo Network";
+        }
     }
 
     if (p.ctrls > -2 && p.ctrls + 1 >= 1) {
@@ -397,7 +429,7 @@ json BuildActivity(const Presence &p) {
             state += (state.empty() ? "" : " ") + std::string("(") + std::to_string(size) + " of " + std::to_string(max) + ")";
         }
         else {
-            activity["party"] = {{"id", "wiiu"}, {"size", {size, max}}, {"privacy", 1}};
+            activity["party"] = PartyJson(size, max);
         }
     }
 
@@ -535,7 +567,7 @@ bool UpdateUnsafe(const Presence &p) {
 
     // Discord refused a field: leave it out (also for later updates) and retry.
     // Limited, so a problem we don't understand can't cause a burst of requests.
-    for (int attempt = 0; attempt < 2 && r.status == 400; attempt++) {
+    for (int attempt = 0; attempt < 3 && r.status == 400; attempt++) {
         std::string path;
         std::string reason = FirstError(r, path);
 
@@ -545,8 +577,14 @@ bool UpdateUnsafe(const Presence &p) {
         else {
             std::string field = FieldFromPath(path);
             if (IsRequiredField(field) || rejectedFields.count(field)) break;
-            rejectedFields.insert(field);
-            rejectedReasons[field] = path.substr(13) + ": " + reason;
+
+            if (field == "party" && partyFormat + 1 < PARTY_FORMATS) {
+                partyFormat++; // try the next layout
+            }
+            else {
+                rejectedFields.insert(field);
+                rejectedReasons[field] = path.substr(13) + ": " + reason;
+            }
 
             // Rebuild, so a refused party moves into the state text
             activity = BuildActivity(p);
