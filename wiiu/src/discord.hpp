@@ -409,9 +409,9 @@ json BuildActivity(const Presence &p) {
         activity["assets"]["large_image"] = AssetUrl("preview");
     }
 
-    // "NID: name" under the game, "PNID: name" when connected to Pretendo
+    // "NNID: name" under the game, "PNID: name" when connected to Pretendo
     const std::string &net = p.realNetwork.empty() ? p.network : p.realNetwork;
-    std::string state      = p.nnid.empty() ? "" : (net == "pn" ? "PNID: " : "NID: ") + p.nnid;
+    std::string state      = p.nnid.empty() ? "" : (net == "pn" ? "PNID: " : "NNID: ") + p.nnid;
 
     // Nintendo Network / Pretendo icon, from the art assets "nn" and "pn"
     if (!p.network.empty()) {
@@ -428,7 +428,7 @@ json BuildActivity(const Presence &p) {
         int max  = size > 4 ? 8 : 4;
         if (rejectedFields.count("party")) {
             // Discord doesn't take a party here; show it the way Discord
-            // would have: "NID: name (1 of 4)"
+            // would have: "NNID: name (1 of 4)"
             state += (state.empty() ? "" : " ") + std::string("(") + std::to_string(size) + " of " + std::to_string(max) + ")";
         }
         else {
