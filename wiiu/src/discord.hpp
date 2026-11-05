@@ -32,6 +32,11 @@ namespace DiscordDirect {
 
 using json = nlohmann::json;
 
+// Never throws on invalid UTF-8 (a title name could contain some)
+std::string Dump(const json &j) {
+    return j.dump(-1, ' ', false, json::error_handler_t::replace);
+}
+
 const std::string API        = "https://discord.com/api/v10";
 const std::string ICON_REPO  = "https://raw.githubusercontent.com/flamingnineteen/richpresencewups-db/main";
 const char *USER_AGENT       = "WiiURichPresence (https://github.com/sennecaelen/RichPresenceWUPS)";
@@ -76,7 +81,7 @@ bool needsSetup    = false; // the tokens were rejected, the setup script has to
 std::string sessionToken;
 long long clockOffset = 0; // UTC - Wii U local time, in seconds
 bool clockKnown       = false;
-json titles;
+std::string titles; // raw titles.json, searched instead of parsed to save memory
 bool titlesLoaded = false;
 std::string lastError = "Not connected yet";
 std::atomic<bool> abortRequests = false;
@@ -88,8 +93,14 @@ struct Response {
 };
 
 size_t WriteCallback(char *ptr, size_t size, size_t nmemb, void *userdata) {
-    static_cast<std::string *>(userdata)->append(ptr, size * nmemb);
-    return size * nmemb;
+    try {
+        auto *out = static_cast<std::string *>(userdata);
+        if (out->size() + size * nmemb > 256 * 1024) return 0; // nothing we fetch is this big
+        out->append(ptr, size * nmemb);
+        return size * nmemb;
+    } catch (...) {
+        return 0; // makes curl stop with an error instead of crashing
+    }
 }
 
 // Lets a running request be cancelled when the title closes.
@@ -223,7 +234,7 @@ bool SaveTokens() {
     {
         std::ofstream f(tmp, std::ios::trunc);
         if (!f.is_open()) return false;
-        f << j.dump(4);
+        f << j.dump(4, ' ', false, json::error_handler_t::replace);
         if (!f.good()) return false;
     }
 
@@ -277,18 +288,35 @@ bool RefreshTokens() {
 void LoadTitles() {
     Response r = Request(ICON_REPO + "/titles.json");
     if (!r.ok || r.status != 200) return;
-    try {
-        titles       = json::parse(r.body);
-        titlesLoaded = true;
-    } catch (...) {
-    }
+    titles       = std::move(r.body);
+    titlesLoaded = true;
 }
 
+/**
+ * Looks up `"<title>": "<icon>"` in the raw titles.json.
+ */
 std::string IconUrl(const std::string &longName) {
-    if (titlesLoaded && titles.contains(longName) && titles[longName].is_string()) {
-        return ICON_REPO + "/icons/" + titles[longName].get<std::string>();
+    const std::string fallback = ICON_REPO + "/icons/menu.jpg";
+    if (!titlesLoaded) return fallback;
+
+    std::string key = Dump(json(longName)); // quoted and escaped like in the file
+    size_t pos      = titles.find(key);
+    while (pos != std::string::npos) {
+        size_t i = pos + key.size();
+        while (i < titles.size() && isspace(static_cast<unsigned char>(titles[i]))) i++;
+        if (i < titles.size() && titles[i] == ':') {
+            i++;
+            while (i < titles.size() && isspace(static_cast<unsigned char>(titles[i]))) i++;
+            if (i < titles.size() && titles[i] == '"') {
+                size_t end = titles.find('"', i + 1);
+                if (end == std::string::npos) return fallback;
+                return ICON_REPO + "/icons/" + titles.substr(i + 1, end - i - 1);
+            }
+            return fallback;
+        }
+        pos = titles.find(key, pos + 1);
     }
-    return ICON_REPO + "/icons/menu.jpg";
+    return fallback;
 }
 
 json BuildActivity(const Presence &p) {
@@ -321,14 +349,14 @@ json BuildActivity(const Presence &p) {
 Response PostSession(const json &activity) {
     json body = {{"activities", json::array({activity})}};
     if (!sessionToken.empty()) body["token"] = sessionToken;
-    return Request(API + "/users/@me/headless-sessions", body.dump(), "application/json", tokens.accessToken);
+    return Request(API + "/users/@me/headless-sessions", Dump(body), "application/json", tokens.accessToken);
 }
 
 /**
  * Creates or updates the headless session.
  * @return Whether Discord accepted the presence.
  */
-bool Update(const Presence &p) {
+bool UpdateUnsafe(const Presence &p) {
     if (!tokensLoaded && !LoadTokens()) return false;
     if (needsSetup) return false;
 
@@ -375,11 +403,34 @@ bool Update(const Presence &p) {
  * Removes the presence from Discord right away instead of waiting for the
  * session to expire.
  */
-void Clear() {
+void ClearUnsafe() {
     if (sessionToken.empty() || !tokensLoaded) return;
     json body = {{"token", sessionToken}};
-    Request(API + "/users/@me/headless-sessions/delete", body.dump(), "application/json", tokens.accessToken, 3);
+    Request(API + "/users/@me/headless-sessions/delete", Dump(body), "application/json", tokens.accessToken, 3);
     sessionToken.clear();
+}
+
+/**
+ * Safe wrappers: an error must never crash the console, it is shown in the
+ * config menu instead.
+ */
+bool Update(const Presence &p) {
+    try {
+        return UpdateUnsafe(p);
+    } catch (const std::exception &e) {
+        lastError = std::string("Internal error: ") + e.what();
+    } catch (...) {
+        lastError = "Internal error";
+    }
+    return false;
+}
+
+void Clear() {
+    try {
+        ClearUnsafe();
+    } catch (...) {
+        sessionToken.clear();
+    }
 }
 
 void Init(const std::string &environmentPath) {
@@ -398,7 +449,8 @@ void Deinit() {
  */
 std::string StatusText() {
     if (!curlReady) return "Status: CURLWrapperModule missing";
-    if (!tokensLoaded && !std::filesystem::exists(tokenPath)) return "Status: no token file, run the setup script";
+    std::error_code ec;
+    if (!tokensLoaded && !std::filesystem::exists(tokenPath, ec)) return "Status: no token file, run the setup script";
     if (needsSetup) return "Status: Discord login expired, run the setup script";
     if (lastError.empty()) return "Status: connected to Discord";
     return "Status: " + lastError;

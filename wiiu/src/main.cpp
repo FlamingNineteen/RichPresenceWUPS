@@ -55,7 +55,28 @@ void Broadcast(const std::string& json) {
 }
 
 // Main background loop to broadcast current info
+void GameLoopUnsafe(std::stop_token stoken);
+
+// Reads a number from meta.xml; 0 when it can't be read (std::stoi would throw).
+int XmlInt(const std::string &tag) {
+    std::string value = GetXmlTag(tag);
+    char *end         = nullptr;
+    long n            = strtol(value.c_str(), &end, 10);
+    return end == value.c_str() ? 0 : static_cast<int>(n);
+}
+
+// An exception leaving a thread aborts the whole console, so catch everything.
 void GameLoop(std::stop_token stoken) {
+    try {
+        GameLoopUnsafe(stoken);
+    } catch (const std::exception &e) {
+        DiscordDirect::lastError = std::string("Internal error: ") + e.what();
+    } catch (...) {
+        DiscordDirect::lastError = "Internal error";
+    }
+}
+
+void GameLoopUnsafe(std::stop_token stoken) {
     int ctrls;
     std::string details, nnid, network, json;
 
@@ -73,7 +94,7 @@ void GameLoop(std::stop_token stoken) {
                     ctrls = GetCtrlNum()-1;
                     break;
                 case CTRLCOUNTMETA:
-                    ctrls = std::stoi(GetXmlTag("drc_use")) > 1 ? 0 : GetCtrlNum() + std::stoi(GetXmlTag("drc_use")) - 1;
+                    ctrls = XmlInt("drc_use") > 1 ? 0 : GetCtrlNum() + XmlInt("drc_use") - 1;
                     break;
                 default:
                     ctrls = -2;
@@ -85,7 +106,7 @@ void GameLoop(std::stop_token stoken) {
                     nnid = "";
                     break;
                 case NETDISPLAYMETA:
-                    nnid = std::stoi(GetXmlTag("online_account_use")) ? GetNetworkId() : "";
+                    nnid = XmlInt("online_account_use") ? GetNetworkId() : "";
                     break;
                 case NETDISPLAY:
                     nnid = GetNetworkId();
@@ -100,7 +121,7 @@ void GameLoop(std::stop_token stoken) {
                     network = "";
                     break;
                 case NETDISPLAYMETA:
-                    network = std::stoi(GetXmlTag("online_account_use")) ? GetNetwork(INKAY_EXISTS, INKAY_CONFIG) : "";
+                    network = XmlInt("online_account_use") ? GetNetwork(INKAY_EXISTS, INKAY_CONFIG) : "";
                     break;
                 case NETDISPLAY:
                     network = GetNetwork(INKAY_EXISTS, INKAY_CONFIG);
