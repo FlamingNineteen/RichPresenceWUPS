@@ -140,6 +140,7 @@ void GameLoopUnsafe(std::stop_token stoken) {
                 p.longName = ReplaceSlashN(GetAppTitle(ENGLISH, true));
                 p.nnid     = nnid;
                 p.network  = network;
+                if (!nnid.empty()) p.realNetwork = GetNetwork(INKAY_EXISTS, INKAY_CONFIG);
                 p.ctrls    = ctrls;
                 p.start    = elapsed;
 

@@ -58,12 +58,13 @@ struct Presence {
     std::string name;     // Title shown as the activity name
     std::string longName; // Full English title, used to find the icon
     std::string nnid;     // Network ID, empty to hide
-    std::string network;  // "nn", "pn" or empty
+    std::string network;  // "nn", "pn" or empty, for the small icon
+    std::string realNetwork; // network actually in use, also when its icon is hidden
     int ctrls = -2;       // Controller count, -2 to hide
     long long start = 0;  // Start time in Wii U local seconds
 
     std::string Key() const {
-        return name + "|" + longName + "|" + nnid + "|" + network + "|" + std::to_string(ctrls) + "|" + std::to_string(start);
+        return name + "|" + longName + "|" + nnid + "|" + network + "|" + std::to_string(ctrls) + "|" + std::to_string(start) + "|" + realNetwork;
     }
 };
 
@@ -412,7 +413,8 @@ json BuildActivity(const Presence &p) {
 
     // The network ID only shows when hovering over the network icon:
     // "Using Pretendo Network | PNID: name"
-    std::string idLabel = p.network == "pn" ? "PNID: " : (p.network == "nn" ? "NNID: " : "NID: ");
+    const std::string &net = p.realNetwork.empty() ? p.network : p.realNetwork;
+    std::string idLabel    = net == "pn" ? "PNID: " : (net == "nn" ? "NNID: " : "NID: ");
     std::string idText  = p.nnid.empty() ? "" : idLabel + p.nnid;
     bool idShown        = false;
 
