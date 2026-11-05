@@ -45,8 +45,11 @@ bool FileContains(const std::string &path, const std::string &needle) {
     if (!f.is_open()) return false;
     std::string carry;
     std::vector<char> buffer(64 * 1024);
-    while (f) {
+    size_t total = 0;
+    // Stop when the title closes, and don't read more than 8 MB
+    while (f && !DiscordDirect::abortRequests && total < 8 * 1024 * 1024) {
         f.read(buffer.data(), buffer.size());
+        total += f.gcount();
         std::string chunk = carry + std::string(buffer.data(), f.gcount());
         for (char &c : chunk) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
         if (chunk.find(needle) != std::string::npos) return true;
@@ -63,7 +66,8 @@ bool IsProtarium() {
         for (const auto &entry : std::filesystem::directory_iterator(ENVIRONMENT_PATH + folder, ec)) {
             std::string name = entry.path().filename().string();
             for (char &c : name) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
-            if (name.find("inkay") != std::string::npos && FileContains(entry.path().string(), "protarium")) {
+            if (name.find("protarium") != std::string::npos ||
+                (name.find("inkay") != std::string::npos && FileContains(entry.path().string(), "protarium"))) {
                 protariumState = 1;
                 return true;
             }
@@ -74,7 +78,7 @@ bool IsProtarium() {
 
 // "nn", "pn", "pr" (Protarium) or ""
 std::string CurrentNetwork() {
-    std::string network = CurrentNetwork();
+    std::string network = GetNetwork(INKAY_EXISTS, INKAY_CONFIG);
     if (network == "pn" && IsProtarium()) network = "pr";
     return network;
 }
@@ -172,7 +176,7 @@ void GameLoopUnsafe(std::stop_token stoken) {
                     network = XmlInt("online_account_use") ? CurrentNetwork() : "";
                     break;
                 case NETDISPLAY:
-                    network = GetNetwork(INKAY_EXISTS, INKAY_CONFIG);
+                    network = CurrentNetwork();
                     break;
                 default:
                     network = "";
