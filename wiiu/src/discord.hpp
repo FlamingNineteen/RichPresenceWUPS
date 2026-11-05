@@ -24,6 +24,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <string>
 
 #include "json.hpp"
@@ -37,7 +38,7 @@ std::string Dump(const json &j) {
     return j.dump(-1, ' ', false, json::error_handler_t::replace);
 }
 
-const std::string API        = "https://discord.com/api/v10";
+std::string API              = "https://discord.com/api/v10";
 const std::string ICON_REPO  = "https://raw.githubusercontent.com/flamingnineteen/richpresencewups-db/main";
 const char *USER_AGENT       = "WiiURichPresence (https://github.com/sennecaelen/RichPresenceWUPS)";
 const char *TOKEN_FILE_NAME  = "richpresence_discord.json";
@@ -85,6 +86,8 @@ std::string titles; // raw titles.json, searched instead of parsed to save memor
 bool titlesLoaded = false;
 std::string lastError = "Not connected yet";
 std::atomic<bool> abortRequests = false;
+std::set<std::string> rejectedFields; // activity fields Discord refused, left out from then on
+long long blockedUntil = 0;           // Wii U local time until which Discord asked us to wait
 
 struct Response {
     bool ok     = false; // the transfer itself worked
@@ -347,46 +350,90 @@ json BuildActivity(const Presence &p) {
 }
 
 /**
- * Turns Discord's "Invalid Form Body" answer into something readable, e.g.
- * "activities.0.party.size: Must be ..." instead of the raw JSON.
+ * Finds the first entry in Discord's "errors" tree.
+ * @param path Set to e.g. "activities.0.party.size".
+ * @return The error message, or the top level message.
  */
-std::string DescribeError(const Response &r) {
+std::string FirstError(const Response &r, std::string &path) {
+    path.clear();
     try {
-        json j = json::parse(r.body);
+        json j           = json::parse(r.body);
         std::string text = j.value("message", std::string("unknown"));
 
-        // Walk down to the first "_errors" entry and remember the path
         const json *node = j.contains("errors") ? &j["errors"] : nullptr;
-        std::string path;
         while (node != nullptr && node->is_object() && !node->contains("_errors") && !node->empty()) {
             path += (path.empty() ? "" : ".") + node->begin().key();
             node = &node->begin().value();
         }
         if (node != nullptr && node->is_object() && node->contains("_errors") && (*node)["_errors"].is_array() && !(*node)["_errors"].empty()) {
             const json &e = (*node)["_errors"][0];
-            text = path + ": " + e.value("message", e.value("code", std::string("invalid")));
+            text          = e.value("message", e.value("code", std::string("invalid")));
         }
-        return "Discord " + std::to_string(r.status) + ": " + text;
+        return text;
     } catch (...) {
-        return "Discord " + std::to_string(r.status) + ": " + r.body.substr(0, 80);
+        return r.body.substr(0, 80);
     }
 }
 
+std::string DescribeError(const Response &r) {
+    std::string path;
+    std::string text = FirstError(r, path);
+    return "Discord " + std::to_string(r.status) + ": " + (path.empty() ? "" : path + ": ") + text;
+}
+
 /**
- * The smallest activity Discord accepts, used when it refuses one of the
- * optional fields.
+ * Which activity field an error path points at: "party", "timestamps",
+ * "assets.small_image", ... Empty when it's not about the activity.
  */
-json MinimalActivity(const json &full) {
-    json minimal = {
-        {"name", full["name"]},
-        {"application_id", full["application_id"]},
-        {"platform", full["platform"]},
-        {"type", 0},
-        {"details", full["details"]}};
-    if (full.contains("assets") && full["assets"].contains("large_image")) {
-        minimal["assets"] = {{"large_image", full["assets"]["large_image"]}, {"large_text", full["assets"]["large_text"]}};
+std::string FieldFromPath(const std::string &path) {
+    const std::string prefix = "activities.0.";
+    if (path.rfind(prefix, 0) != 0) return "";
+    std::string rest  = path.substr(prefix.size());
+    std::string first = rest.substr(0, rest.find('.'));
+    if (first == "assets" && rest.size() > 7) {
+        std::string second = rest.substr(7);
+        return "assets." + second.substr(0, second.find('.'));
     }
-    return minimal;
+    return first;
+}
+
+// Fields that can never be dropped, Discord needs them
+bool IsRequiredField(const std::string &field) {
+    return field.empty() || field == "name" || field == "application_id" || field == "type" || field == "platform";
+}
+
+void StripRejected(json &activity) {
+    for (const std::string &field : rejectedFields) {
+        if (field.rfind("assets.", 0) == 0) {
+            if (!activity.contains("assets")) continue;
+            std::string key = field.substr(7);
+            activity["assets"].erase(key);
+            if (key == "large_image") activity["assets"].erase("large_text");
+            if (key == "small_image") activity["assets"].erase("small_text");
+            if (activity["assets"].empty()) activity.erase("assets");
+        }
+        else {
+            activity.erase(field);
+        }
+    }
+}
+
+std::string RejectedList() {
+    std::string out;
+    for (const std::string &field : rejectedFields) out += (out.empty() ? "" : ", ") + field;
+    return out;
+}
+
+/**
+ * Seconds Discord wants us to wait after a 429.
+ */
+long long RetryAfter(const Response &r) {
+    try {
+        double seconds = json::parse(r.body).value("retry_after", 60.0);
+        return static_cast<long long>(seconds) + 1;
+    } catch (...) {
+        return 60;
+    }
 }
 
 Response PostSession(const json &activity) {
@@ -403,6 +450,10 @@ bool UpdateUnsafe(const Presence &p) {
     if (!tokensLoaded && !LoadTokens()) return false;
     if (needsSetup) return false;
 
+    // Discord asked us to slow down
+    long long now = static_cast<long long>(time(NULL));
+    if (now < blockedUntil) return false;
+
     // The first request teaches us the clock offset, which the start time needs.
     if (!titlesLoaded) LoadTitles();
     if (!clockKnown) Request(API + "/gateway");
@@ -411,7 +462,8 @@ bool UpdateUnsafe(const Presence &p) {
     if (tokens.expiresAt != 0 && NowUtc() > tokens.expiresAt - REFRESH_MARGIN) RefreshTokens();
 
     json activity = BuildActivity(p);
-    Response r    = PostSession(activity);
+    StripRejected(activity);
+    Response r = PostSession(activity);
     if (!r.ok) return false;
 
     if (r.status == 401) {
@@ -420,28 +472,47 @@ bool UpdateUnsafe(const Presence &p) {
         if (!r.ok) return false;
     }
 
-    // A rejected session token (expired after 20 minutes, or deleted) is
-    // replaced by a new session.
-    if (r.status >= 400 && r.status < 500 && r.status != 401 && r.status != 429 && !sessionToken.empty()) {
+    // Discord refused a field: leave it out (also for later updates) and retry.
+    // Limited, so a problem we don't understand can't cause a burst of requests.
+    for (int attempt = 0; attempt < 2 && r.status == 400; attempt++) {
+        std::string path;
+        FirstError(r, path);
+
+        if (path.rfind("token", 0) == 0 && !sessionToken.empty()) {
+            sessionToken.clear(); // the session expired, start a new one
+        }
+        else {
+            std::string field = FieldFromPath(path);
+            if (IsRequiredField(field) || rejectedFields.count(field)) break;
+            rejectedFields.insert(field);
+            StripRejected(activity);
+        }
+
+        r = PostSession(activity);
+        if (!r.ok) return false;
+    }
+
+    // The session is gone (expired or removed): start a new one, once
+    if (r.status == 404 && !sessionToken.empty()) {
         sessionToken.clear();
         r = PostSession(activity);
         if (!r.ok) return false;
     }
 
-    // Discord refused a field: show what it was, and still set a basic presence
-    std::string fieldError;
-    if (r.status == 400) {
-        fieldError = DescribeError(r);
-        r          = PostSession(MinimalActivity(activity));
-        if (!r.ok) return false;
+    if (r.status == 429) {
+        long long wait = RetryAfter(r);
+        blockedUntil   = now + wait;
+        lastError      = "Discord rate limit, waiting " + std::to_string(wait) + "s";
+        return false;
     }
 
     if (r.status == 200) {
         try {
-            sessionToken = json::parse(r.body).value("token", std::string());
+            std::string token = json::parse(r.body).value("token", std::string());
+            if (!token.empty()) sessionToken = token;
         } catch (...) {
         }
-        lastError = fieldError.empty() ? "" : "connected, but " + fieldError;
+        lastError = rejectedFields.empty() ? "" : "connected, Discord refused: " + RejectedList();
         return true;
     }
 
@@ -505,6 +576,7 @@ std::string StatusText() {
     if (needsSetup) return "Status: Discord login expired, run the setup script";
     if (lastError.empty()) return "Status: connected to Discord";
     if (lastError.rfind("connected", 0) == 0) return "Status: " + lastError;
+    if (!lastError.empty() && !rejectedFields.empty()) return "Status: " + lastError + " (refused: " + RejectedList() + ")";
     return "Status: " + lastError;
 }
 

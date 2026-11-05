@@ -238,11 +238,10 @@ ON_APPLICATION_START() {
 }
 
 ON_APPLICATION_REQUESTS_EXIT() {    
+    // The session is kept and updated by the next title: deleting and
+    // recreating it on every app switch gets rate limited by Discord.
+    // After the console turns off, Discord removes it within 20 minutes.
     StopPresenceThread();
-
-    // Remove the presence now, otherwise it would stay up to 20 minutes after
-    // turning the console off. The next title creates a new one right away.
-    if (config.mode.value == MODE_DIRECT) DiscordDirect::Clear();
 }
 
 DEINITIALIZE_PLUGIN() {
