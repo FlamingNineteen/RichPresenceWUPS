@@ -51,7 +51,7 @@ CXXFLAGS += -DDEBUG -DVERBOSE_DEBUG -g
 CFLAGS += -DDEBUG -DVERBOSE_DEBUG -g
 endif
 
-LIBS	:= -lwups -lwut -lmocha
+LIBS	:= -lcurlwrapper -lwups -lwut -lmocha
 
 
 #-------------------------------------------------------------------------------

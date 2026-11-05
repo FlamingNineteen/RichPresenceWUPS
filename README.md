@@ -1,6 +1,48 @@
 # Wii U Rich Presence Plugin
 
-This plugin uses UDP to communicate with an application on your computer to set Discord Rich Presence for the user. The activity is set based on the application currently being played, the time the application was loaded, the amount of controllers connected and more.
+This plugin sets Discord Rich Presence based on the application currently being played, the time the application was loaded, the amount of controllers connected and more.
+
+This fork adds a **direct mode**: the plugin talks to Discord itself over HTTPS, so **no application has to run on your computer**. Your status shows up even when Discord is only open on your phone. The original mode, which sends UDP packets to an application on your computer, is still available.
+
+## Direct mode (no computer needed)
+
+Direct mode uses Discord's headless sessions, the same mechanism used by projects like [Reef](https://github.com/bentheminernz/reef). You log in once with a small script; after that the Wii U keeps the login fresh by itself.
+
+> [!NOTE]
+> Headless sessions are not part of Discord's official public documentation, so Discord could change them in the future. The login is a normal OAuth2 login that can only set your activity: it does not give access to your messages or account.
+
+### 1. Create a Discord application
+
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and create a new application (the name is shown in some places, e.g. "Wii U").
+2. Copy the **Application ID** from *General Information*.
+3. In *OAuth2*, turn on **Public Client** and add the redirect `http://127.0.0.1:8765/callback`.
+4. Enable the **Discord Social SDK** for the application (Getting Started form in the Social SDK section).
+5. Optional: under *Rich Presence > Art Assets*, upload images named `nn` and `pn` to show a small Nintendo Network / Pretendo icon.
+
+### 2. Log in once
+
+On any computer with Python 3 (no extra packages needed), run [`setup/discord_setup.py`](setup/discord_setup.py) with the Wii U's SD card inserted:
+
+```bash
+python setup/discord_setup.py --client-id <APPLICATION ID> --sd <SD CARD ROOT>
+```
+
+Your browser opens to log in to Discord. The script checks that presence works and writes `richpresence_discord.json` to `sd:/wiiu/environments/aroma/plugins/config/`. Use `--environment` if your environment is not called `aroma`, or leave out `--sd` to save the file next to the script and copy it yourself.
+
+Keep this file private: anyone who has it can set your Discord activity. If the login ever expires (the plugin's *Setup* menu shows the status), run the script again.
+
+### 3. Install on the Wii U
+
+1. Copy `RichPresence.wps` into `sd:/wiiu/environments/[ENVIRONMENT]/plugins`.
+2. Copy `CURLWrapperModule.wms` from the [CURLWrapperModule releases](https://github.com/wiiu-env/CURLWrapperModule/releases) into `sd:/wiiu/environments/[ENVIRONMENT]/modules` (already present on most Aroma setups).
+3. Requires the [WiiUPluginLoaderBackend](https://github.com/wiiu-env/WiiUPluginLoaderBackend) in `sd:/wiiu/environments/[ENVIRONMENT]/modules`.
+4. In the plugin's configuration menu, *Setup > Send presence* should be set to *directly to Discord* (the default).
+
+The presence is refreshed every few minutes while you play and removed when a title closes. The elapsed time is corrected for the Wii U's clock automatically, so the timezone options are not needed in direct mode.
+
+## Computer mode (original)
+
+The steps below set up the original mode, where an application on your computer forwards the presence to the Discord desktop app. Set *Setup > Send presence* to *via the computer application* in the plugin's configuration menu.
 
 ## Installation
 

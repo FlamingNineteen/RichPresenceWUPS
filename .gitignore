@@ -10,3 +10,6 @@ ignore/
 *.wps
 *.zip
 *.tar.xz
+
+# Direct mode login, never commit
+richpresence_discord.json

@@ -9,6 +9,7 @@
 #include <wups/config_api.h>
 
 #include "consts.hpp"
+#include "discord.hpp"
 
 /**
  * A configuration option.
@@ -61,6 +62,17 @@ enum LangOptions {
 };
 
 /**
+ * How the presence reaches Discord.
+ */
+enum ConnectionMode {
+    // The plugin talks to Discord itself, no computer needed
+    MODE_DIRECT,
+
+    // Send UDP packets to the computer application (original behaviour)
+    MODE_PC
+};
+
+/**
  * Options for network display
  */
 enum NetDisplay {
@@ -80,6 +92,9 @@ enum NetDisplay {
 struct {
     ConfigOption<bool> enabled = 
     ConfigOption<bool>("enabled", true);
+
+    ConfigOption<ConnectionMode> mode = 
+    ConfigOption<ConnectionMode>("mode", MODE_DIRECT);
 
     ConfigOption<NetDisplay> net_id = 
     ConfigOption<NetDisplay>("netid", NETDISPLAYMETA);
@@ -182,6 +197,10 @@ void multipleValueItemChanged(ConfigItemMultipleValues *item, uint32_t newValue)
         config.lang.value = (LangOptions) newValue;
     }
 
+    if (std::string_view(config.mode.id) == item->identifier) {
+        config.mode.value = (ConnectionMode) newValue;
+    }
+
     // If the value has changed, we store it in the storage.
     WUPSStorageAPI::Store(item->identifier, newValue);
 }
@@ -195,10 +214,31 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
          * Setup Category
         */
         auto setupCat = WUPSConfigCategory::Create("Setup");
-        setupCat.add(WUPSConfigItemStub::Create("This plugin works with a computer application."));
-        setupCat.add(WUPSConfigItemStub::Create("That application must be running to update rich presence."));
+
+        constexpr WUPSConfigItemMultipleValues::ValuePair modeOptValues[] = {
+            {MODE_DIRECT, "directly to Discord (no computer)"},
+            {MODE_PC, "via the computer application"}
+        };
+
+        // Connection mode multiselect
+        setupCat.add(WUPSConfigItemMultipleValues::CreateFromValue(config.mode.id, "Send presence",
+                                                                  config.mode.def, config.mode.value,
+                                                                  modeOptValues,
+                                                                  multipleValueItemChanged));
+
+        if (config.mode.value == MODE_DIRECT) {
+            // Kept alive for as long as the menu might read it
+            static std::string statusLine;
+            statusLine = DiscordDirect::StatusText();
+            setupCat.add(WUPSConfigItemStub::Create(statusLine.c_str()));
+            setupCat.add(WUPSConfigItemStub::Create("Direct mode needs the CURLWrapperModule and a token file"));
+            setupCat.add(WUPSConfigItemStub::Create("made once with setup/discord_setup.py on a computer."));
+        }
+        else {
+            setupCat.add(WUPSConfigItemStub::Create("The computer application must be running to update rich presence."));
+        }
         setupCat.add(WUPSConfigItemStub::Create("Check this plugin's repository for more information:"));
-        setupCat.add(WUPSConfigItemStub::Create("https://github.com/flamingnineteen/RichPresenceWUPS"));
+        setupCat.add(WUPSConfigItemStub::Create("https://github.com/sennecaelen/RichPresenceWUPS"));
         
         /* 
          * Display Category
@@ -244,13 +284,13 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
                                                                     multipleValueItemChanged));
 
         // Timeset integer range
-        displayCat.add(WUPSConfigItemIntegerRange::Create(config.timeset.id, "Offset \"elapsed time\" timezone for correct display",
+        displayCat.add(WUPSConfigItemIntegerRange::Create(config.timeset.id, "Offset \"elapsed time\" timezone (computer mode only)",
                                                          config.timeset.def, config.timeset.value,
                                                          -12, 12,
                                                          &integerRangeItemChanged));
         
         // Daylight savings time boolean
-        displayCat.add(WUPSConfigItemBoolean::Create(config.dst.id, "Conform to Daylight Savings Time",
+        displayCat.add(WUPSConfigItemBoolean::Create(config.dst.id, "Conform to Daylight Savings Time (computer mode only)",
                                                     config.dst.def, config.dst.value,
                                                     boolItemChanged));
 
@@ -287,7 +327,7 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         auto advCat = WUPSConfigCategory::Create("Advanced");
 
         // IP filter boolean
-        advCat.add(WUPSConfigItemBoolean::Create(config.ip_filter.id, "Only send data to a specific IP address",
+        advCat.add(WUPSConfigItemBoolean::Create(config.ip_filter.id, "Only send data to a specific IP address (computer mode)",
                                                 config.ip_filter.def, config.ip_filter.value,
                                                 &boolItemChanged));
 

@@ -1,0 +1,32 @@
+name: Build plugin
+
+on:
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'wiiu/**'
+      - '.github/workflows/build-plugin.yml'
+  pull_request:
+    paths:
+      - 'wiiu/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          cd wiiu
+          docker build . -t builder
+          docker run --rm -v ${PWD}:/project builder make
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: RichPresence.wps
+          path: ./wiiu/*.wps

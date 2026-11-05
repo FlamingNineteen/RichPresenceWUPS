@@ -16,7 +16,7 @@
 WUPS_PLUGIN_NAME("RichPresence");
 WUPS_PLUGIN_DESCRIPTION("Discord Rich Presence for the Wii U.");
 WUPS_PLUGIN_VERSION(VERSION);
-WUPS_PLUGIN_AUTHOR("Flaming19");
+WUPS_PLUGIN_AUTHOR("Flaming19, direct mode by sennecaelen");
 WUPS_PLUGIN_LICENSE("GPL");
 
 WUPS_USE_WUT_DEVOPTAB();           // Use the wut devoptabs
@@ -30,6 +30,11 @@ std::string preapp = "quantum random!!!11!";
 
 bool INKAY_EXISTS;
 std::string INKAY_CONFIG;
+
+// Direct mode bookkeeping
+std::string lastSentKey;
+long long lastSentAt = 0;
+bool lastSendOk      = false;
 
 // Broadcast over port 5005
 void Broadcast(const std::string& json) {
@@ -75,7 +80,7 @@ void GameLoop(std::stop_token stoken) {
             }
 
             // Get Network ID
-            switch (config.small_img.value) {
+            switch (config.net_id.value) {
                 case NONETDISPLAY:
                     nnid = "";
                     break;
@@ -108,9 +113,31 @@ void GameLoop(std::stop_token stoken) {
             //     details = std::to_string(ReadFromMemory(0x1098B2AB)>>24) + " | " + std::to_string(ReadFromMemory(0x1098EDEB)>>24);
             // }
             
+            if (config.mode.value == MODE_DIRECT) {
+                DiscordDirect::Presence p;
+                p.name     = app;
+                p.longName = ReplaceSlashN(GetAppTitle(ENGLISH, true));
+                p.nnid     = nnid;
+                p.network  = network;
+                p.ctrls    = ctrls;
+                p.start    = elapsed;
+
+                // Send when something changed, otherwise keep the session alive
+                // (Discord drops it after 20 minutes). Retry sooner after a failure.
+                long long now  = time(NULL);
+                long long wait = lastSendOk ? 240 : 30;
+                std::string key = p.Key();
+                if (key != lastSentKey || now - lastSentAt >= wait) {
+                    lastSendOk  = DiscordDirect::Update(p);
+                    lastSentKey = key;
+                    lastSentAt  = now;
+                }
+            }
+            else {
             // Prepare and send json
             json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetAppTitle(ENGLISH, true)) + "\",\"app\":\"" + app + "\",\"details\":\"" + details + "\",\"time\":" + std::to_string(elapsed + (config.timeset.value * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + network + "\",\"dst\":" + std::to_string(config.dst.value) + ",\"compatibility\":" + std::to_string(COMPATIBLE_VERSION) + "}";
             Broadcast(json);
+            }
         }
 
         // Five second interval
@@ -121,16 +148,29 @@ void GameLoop(std::stop_token stoken) {
     return;
 }
 
+// Stops the presence thread, cancelling a request that is still running.
+void StopPresenceThread() {
+    if (tthread.joinable()) {
+        DiscordDirect::abortRequests = true;
+        tthread.request_stop();
+        tthread.join();
+        DiscordDirect::abortRequests = false;
+    }
+}
+
 void ConfigMenuClosedCallback() {
     WUPSStorageAPI::SaveStorage();
 
     app = GetXmlTag("shortname_en") == "Health and Safety Information" ? "Homebrew Application" : ReplaceSlashN(GetAppTitle(config.lang.value, config.title.value));
     preapp = app;
 
-    if (tthread.joinable()) {
-        tthread.request_stop();
-        tthread.join(); // Wait for thread to finish before starting a new one
-    }
+    StopPresenceThread();
+
+    // Drop the presence when direct mode is off, then pick up a new token file
+    if (!config.enabled.value || config.mode.value != MODE_DIRECT) DiscordDirect::Clear();
+    DiscordDirect::tokensLoaded = false;
+    DiscordDirect::needsSetup   = false;
+    lastSentKey.clear();
 
     if ((config.enabled.value && !(config.cod.value && app.find("Call of Duty") != std::string::npos))) {
         tthread = std::jthread(GameLoop);
@@ -143,6 +183,7 @@ INITIALIZE_PLUGIN() {
     WUPSConfigAPIOptionsV1 configOptions = {.name = "Rich Presence"};
     WUPSConfigAPI_Init(configOptions, ConfigMenuOpenedCallback, ConfigMenuClosedCallback);
     WUPSStorageAPI::GetOrStoreDefault(config.enabled.id, config.enabled.value, config.enabled.def);
+    WUPSStorageAPI::GetOrStoreDefault(config.mode.id, config.mode.value, config.mode.def);
     WUPSStorageAPI::GetOrStoreDefault(config.net_id.id, config.net_id.value, config.net_id.def);
     WUPSStorageAPI::GetOrStoreDefault(config.timeset.id, config.timeset.value, config.timeset.def);
     WUPSStorageAPI::GetOrStoreDefault(config.ctrl.id, config.ctrl.value, config.ctrl.def);
@@ -160,6 +201,8 @@ INITIALIZE_PLUGIN() {
     Mocha_GetEnvironmentPath(environment_path_buffer, sizeof(environment_path_buffer));
     INKAY_CONFIG = std::string(environment_path_buffer) + std::string("/plugins/config/inkay.json");
     INKAY_EXISTS = std::filesystem::exists(INKAY_CONFIG);
+
+    DiscordDirect::Init(std::string(environment_path_buffer));
 }
 
 ON_APPLICATION_START() {
@@ -168,25 +211,23 @@ ON_APPLICATION_START() {
     if (app != preapp) elapsed = time(NULL); // Only update elapsed time if app changed
     preapp = app;
 
-    if (tthread.joinable()) {
-        tthread.request_stop();
-        tthread.join(); // Wait for thread to finish before starting a new one
-    }
+    StopPresenceThread();
+    lastSentKey.clear();
     if (config.enabled.value && !(config.cod.value && app.find("Call of Duty") != std::string::npos)) tthread = std::jthread(GameLoop);
 }
 
 ON_APPLICATION_REQUESTS_EXIT() {    
-    if (tthread.joinable()) {
-        tthread.request_stop();
-        tthread.join(); // Wait for thread to finish
-    }
+    StopPresenceThread();
+
+    // Remove the presence now, otherwise it would stay up to 20 minutes after
+    // turning the console off. The next title creates a new one right away.
+    if (config.mode.value == MODE_DIRECT) DiscordDirect::Clear();
 }
 
 DEINITIALIZE_PLUGIN() {
-    if (tthread.joinable()) {
-        tthread.request_stop();
-        tthread.join(); // Wait for thread to finish
-    }
+    StopPresenceThread();
+    DiscordDirect::Clear();
+    DiscordDirect::Deinit();
 
     Mocha_DeInitLibrary();
 }

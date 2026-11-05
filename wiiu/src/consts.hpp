@@ -1,7 +1,7 @@
 /**
  * The version number of the plugin.
  */
-#define VERSION "v2.3"
+#define VERSION "v2.3-direct"
 
 /**
  * The oldest version of the pc app that the plugin completely supports, as a double.
