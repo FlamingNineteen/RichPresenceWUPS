@@ -408,16 +408,29 @@ json BuildActivity(const Presence &p) {
         activity["assets"]["large_image"] = AssetUrl("preview");
     }
 
-    std::string state = p.nnid.empty() ? "" : "NID: " + p.nnid;
+    std::string state;
+
+    // The network ID only shows when hovering over the network icon:
+    // "Using Pretendo Network | PNID: name"
+    std::string idLabel = p.network == "pn" ? "PNID: " : (p.network == "nn" ? "NNID: " : "NID: ");
+    std::string idText  = p.nnid.empty() ? "" : idLabel + p.nnid;
+    bool idShown        = false;
 
     // Nintendo Network / Pretendo icon, from the art assets "nn" and "pn"
     if (!p.network.empty()) {
         // Without an image Discord would show a "?", so leave it out then
         std::string url = AssetUrl(p.network);
         if (!url.empty()) {
+            std::string text                  = p.network == "nn" ? "Using Nintendo Network" : "Using Pretendo Network";
             activity["assets"]["small_image"] = url;
-            activity["assets"]["small_text"]  = p.network == "nn" ? "Using Nintendo Network" : "Using Pretendo Network";
+            activity["assets"]["small_text"]  = idText.empty() ? text : text + " | " + idText;
+            idShown                           = true;
         }
+    }
+
+    // No network icon to hover over: put it on the game icon instead
+    if (!idShown && !idText.empty()) {
+        activity["assets"]["large_text"] = p.longName + " | " + idText;
     }
 
     if (p.ctrls > -2 && p.ctrls + 1 >= 1) {
@@ -425,7 +438,7 @@ json BuildActivity(const Presence &p) {
         int max  = size > 4 ? 8 : 4;
         if (rejectedFields.count("party")) {
             // Discord doesn't take a party here; show it the way Discord
-            // would have: "NID: name (1 of 4)"
+            // would have: "(1 of 4)"
             state += (state.empty() ? "" : " ") + std::string("(") + std::to_string(size) + " of " + std::to_string(max) + ")";
         }
         else {
