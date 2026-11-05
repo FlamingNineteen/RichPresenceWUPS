@@ -50,7 +50,7 @@ const std::string ORIGINAL_APP_ID = "1353248127469228074";
 
 // Nintendo Network / Pretendo icons hosted in this repository. Loaded the same
 // way as the game icons, which Discord shows reliably.
-const std::string NETWORK_ICONS = "https://raw.githubusercontent.com/sennecaelen/RichPresenceWUPS/direct-discord/icons/";
+const std::string NETWORK_ICONS = "https://raw.githubusercontent.com/sennecaelen/RichPresenceWUPS/main/icons/";
 
 // Refresh the access token this long before it expires.
 constexpr long long REFRESH_MARGIN = 24 * 3600;

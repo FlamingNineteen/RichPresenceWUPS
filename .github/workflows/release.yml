@@ -70,3 +70,34 @@ jobs:
         with:
           name: WURP-${{ matrix.config.name }}${{ matrix.config.ext }}
           path: ./discord/build${{ matrix.config.path }}/WiiURichPresence*
+
+  release:
+    name: Publish release
+    needs: [build-plugin, build-client]
+    # Publish as long as the plugin built, even if a computer client failed
+    if: always() && needs.build-plugin.result == 'success' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download builds
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect files
+        run: |
+          mkdir release
+          find artifacts -type f -exec cp {} release/ \;
+          cp setup/discord_setup.py release/
+          ls -la release
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: .github/release-notes.md
+          files: release/*
