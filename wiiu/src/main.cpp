@@ -301,10 +301,12 @@ ON_APPLICATION_START() {
 }
 
 ON_APPLICATION_REQUESTS_EXIT() {    
-    // The session is kept and updated by the next title: deleting and
-    // recreating it on every app switch gets rate limited by Discord.
-    // After the console turns off, Discord removes it within 20 minutes.
     StopPresenceThread();
+
+    // Turning the console off can't be told apart from switching apps, so the
+    // presence is removed whenever an app closes; otherwise Discord keeps it
+    // for up to 20 minutes after the Wii U is off. The next app sets a new one.
+    if (config.mode.value == MODE_DIRECT) DiscordDirect::Clear();
 }
 
 DEINITIALIZE_PLUGIN() {

@@ -638,8 +638,13 @@ bool UpdateUnsafe(const Presence &p) {
  */
 void ClearUnsafe() {
     if (sessionToken.empty() || !tokensLoaded) return;
-    json body = {{"token", sessionToken}};
-    Request(API + "/users/@me/headless-sessions/delete", Dump(body), "application/json", tokens.accessToken, 3);
+
+    // Skip while Discord asked us to wait; a short timeout keeps app exits quick
+    if (static_cast<long long>(time(NULL)) >= blockedUntil) {
+        json body = {{"token", sessionToken}};
+        Response r = Request(API + "/users/@me/headless-sessions/delete", Dump(body), "application/json", tokens.accessToken, 2);
+        if (r.ok && r.status == 429) blockedUntil = static_cast<long long>(time(NULL)) + RetryAfter(r);
+    }
     sessionToken.clear();
 }
 
