@@ -48,6 +48,10 @@ const char *TOKEN_FILE_NAME  = "richpresence_discord.json";
 // "preview") are used when your own application doesn't have them.
 const std::string ORIGINAL_APP_ID = "1353248127469228074";
 
+// Nintendo Network / Pretendo icons hosted in this repository. Loaded the same
+// way as the game icons, which Discord shows reliably.
+const std::string NETWORK_ICONS = "https://raw.githubusercontent.com/sennecaelen/RichPresenceWUPS/direct-discord/icons/";
+
 // Refresh the access token this long before it expires.
 constexpr long long REFRESH_MARGIN = 24 * 3600;
 
@@ -338,7 +342,8 @@ std::string IconUrl(const std::string &longName) {
  * used as image URLs.
  */
 int LoadAssetsOf(const std::string &appId) {
-    Response r = Request(API + "/oauth2/applications/" + appId + "/assets", "", "", tokens.accessToken);
+    // Public endpoint; a token for another application would only get refused
+    Response r = Request(API + "/oauth2/applications/" + appId + "/assets");
     if (!r.ok) return -1;
     if (r.status != 200) return static_cast<int>(r.status);
     try {
@@ -367,8 +372,7 @@ void LoadAssets() {
     int original = LoadAssetsOf(ORIGINAL_APP_ID);
     assetsLoaded = true;
 
-    std::string found = assetUrls.count("nn") && assetUrls.count("pn") ? "found" : "missing";
-    assetsInfo        = found + " (your app " + std::to_string(own) + ", original " + std::to_string(original) + ")";
+    assetsInfo = "your app " + std::to_string(own) + ", original " + std::to_string(original);
 }
 
 /**
@@ -415,8 +419,9 @@ json BuildActivity(const Presence &p) {
 
     // Nintendo Network / Pretendo icon, from the art assets "nn" and "pn"
     if (!p.network.empty()) {
-        // Without an image Discord would show a "?", so leave it out then
+        // Your own "nn"/"pn" art assets win, otherwise the icons from GitHub
         std::string url = AssetUrl(p.network);
+        if (url.empty() || url.find("/" + ORIGINAL_APP_ID + "/") != std::string::npos) url = NETWORK_ICONS + p.network + ".png";
         if (!url.empty()) {
             activity["assets"]["small_image"] = url;
             activity["assets"]["small_text"]  = p.network == "nn" ? "Using Nintendo Network" : "Using Pretendo Network";
