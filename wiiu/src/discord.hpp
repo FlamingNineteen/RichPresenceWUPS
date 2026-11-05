@@ -338,12 +338,55 @@ json BuildActivity(const Presence &p) {
         activity["assets"]["small_text"]  = p.network == "nn" ? "Using Nintendo Network" : "Using Pretendo Network";
     }
 
-    if (p.ctrls > -2) {
+    if (p.ctrls > -2 && p.ctrls + 1 >= 1) {
         int size              = p.ctrls + 1;
         activity["party"]     = {{"id", "wiiu"}, {"size", {size, size > 4 ? 8 : 4}}};
     }
 
     return activity;
+}
+
+/**
+ * Turns Discord's "Invalid Form Body" answer into something readable, e.g.
+ * "activities.0.party.size: Must be ..." instead of the raw JSON.
+ */
+std::string DescribeError(const Response &r) {
+    try {
+        json j = json::parse(r.body);
+        std::string text = j.value("message", std::string("unknown"));
+
+        // Walk down to the first "_errors" entry and remember the path
+        const json *node = j.contains("errors") ? &j["errors"] : nullptr;
+        std::string path;
+        while (node != nullptr && node->is_object() && !node->contains("_errors") && !node->empty()) {
+            path += (path.empty() ? "" : ".") + node->begin().key();
+            node = &node->begin().value();
+        }
+        if (node != nullptr && node->is_object() && node->contains("_errors") && (*node)["_errors"].is_array() && !(*node)["_errors"].empty()) {
+            const json &e = (*node)["_errors"][0];
+            text = path + ": " + e.value("message", e.value("code", std::string("invalid")));
+        }
+        return "Discord " + std::to_string(r.status) + ": " + text;
+    } catch (...) {
+        return "Discord " + std::to_string(r.status) + ": " + r.body.substr(0, 80);
+    }
+}
+
+/**
+ * The smallest activity Discord accepts, used when it refuses one of the
+ * optional fields.
+ */
+json MinimalActivity(const json &full) {
+    json minimal = {
+        {"name", full["name"]},
+        {"application_id", full["application_id"]},
+        {"platform", full["platform"]},
+        {"type", 0},
+        {"details", full["details"]}};
+    if (full.contains("assets") && full["assets"].contains("large_image")) {
+        minimal["assets"] = {{"large_image", full["assets"]["large_image"]}, {"large_text", full["assets"]["large_text"]}};
+    }
+    return minimal;
 }
 
 Response PostSession(const json &activity) {
@@ -385,17 +428,25 @@ bool UpdateUnsafe(const Presence &p) {
         if (!r.ok) return false;
     }
 
+    // Discord refused a field: show what it was, and still set a basic presence
+    std::string fieldError;
+    if (r.status == 400) {
+        fieldError = DescribeError(r);
+        r          = PostSession(MinimalActivity(activity));
+        if (!r.ok) return false;
+    }
+
     if (r.status == 200) {
         try {
             sessionToken = json::parse(r.body).value("token", std::string());
         } catch (...) {
         }
-        lastError = "";
+        lastError = fieldError.empty() ? "" : "connected, but " + fieldError;
         return true;
     }
 
     if (r.status == 401 || r.status == 403) needsSetup = true;
-    lastError = "Discord error " + std::to_string(r.status) + ": " + r.body.substr(0, 60);
+    lastError = DescribeError(r);
     return false;
 }
 
@@ -453,6 +504,7 @@ std::string StatusText() {
     if (!tokensLoaded && !std::filesystem::exists(tokenPath, ec)) return "Status: no token file, run the setup script";
     if (needsSetup) return "Status: Discord login expired, run the setup script";
     if (lastError.empty()) return "Status: connected to Discord";
+    if (lastError.rfind("connected", 0) == 0) return "Status: " + lastError;
     return "Status: " + lastError;
 }
 
