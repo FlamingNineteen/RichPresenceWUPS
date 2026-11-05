@@ -3,6 +3,7 @@
 #include <malloc.h>
 #include <string.h>
 #include <thread>
+#include <vector>
 
 #include <mocha/mocha.h>
 
@@ -30,6 +31,53 @@ std::string preapp = "quantum random!!!11!";
 
 bool INKAY_EXISTS;
 std::string INKAY_CONFIG;
+
+std::string ENVIRONMENT_PATH;
+int protariumState = -1; // -1 not checked yet, 0 no, 1 yes
+
+/**
+ * Whether the installed Inkay is Protarium's build. Like Prot-endo-Switcher,
+ * this looks for "protarium" inside the Inkay plugin and module files.
+ * Checked once, the first time it's needed.
+ */
+bool FileContains(const std::string &path, const std::string &needle) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f.is_open()) return false;
+    std::string carry;
+    std::vector<char> buffer(64 * 1024);
+    while (f) {
+        f.read(buffer.data(), buffer.size());
+        std::string chunk = carry + std::string(buffer.data(), f.gcount());
+        for (char &c : chunk) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+        if (chunk.find(needle) != std::string::npos) return true;
+        carry = chunk.size() > needle.size() ? chunk.substr(chunk.size() - needle.size()) : chunk;
+    }
+    return false;
+}
+
+bool IsProtarium() {
+    if (protariumState != -1) return protariumState == 1;
+    protariumState = 0;
+    for (const char *folder : {"/plugins", "/modules"}) {
+        std::error_code ec;
+        for (const auto &entry : std::filesystem::directory_iterator(ENVIRONMENT_PATH + folder, ec)) {
+            std::string name = entry.path().filename().string();
+            for (char &c : name) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+            if (name.find("inkay") != std::string::npos && FileContains(entry.path().string(), "protarium")) {
+                protariumState = 1;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// "nn", "pn", "pr" (Protarium) or ""
+std::string CurrentNetwork() {
+    std::string network = CurrentNetwork();
+    if (network == "pn" && IsProtarium()) network = "pr";
+    return network;
+}
 
 // Direct mode bookkeeping
 std::string lastSentKey;
@@ -121,7 +169,7 @@ void GameLoopUnsafe(std::stop_token stoken) {
                     network = "";
                     break;
                 case NETDISPLAYMETA:
-                    network = XmlInt("online_account_use") ? GetNetwork(INKAY_EXISTS, INKAY_CONFIG) : "";
+                    network = XmlInt("online_account_use") ? CurrentNetwork() : "";
                     break;
                 case NETDISPLAY:
                     network = GetNetwork(INKAY_EXISTS, INKAY_CONFIG);
@@ -140,7 +188,7 @@ void GameLoopUnsafe(std::stop_token stoken) {
                 p.longName = ReplaceSlashN(GetAppTitle(ENGLISH, true));
                 p.nnid     = nnid;
                 p.network  = network;
-                if (!nnid.empty()) p.realNetwork = GetNetwork(INKAY_EXISTS, INKAY_CONFIG);
+                if (!nnid.empty()) p.realNetwork = CurrentNetwork();
                 p.ctrls    = ctrls;
                 p.start    = elapsed;
 
@@ -157,7 +205,7 @@ void GameLoopUnsafe(std::stop_token stoken) {
             }
             else {
             // Prepare and send json
-            json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetAppTitle(ENGLISH, true)) + "\",\"app\":\"" + app + "\",\"details\":\"" + details + "\",\"time\":" + std::to_string(elapsed + (config.timeset.value * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + network + "\",\"dst\":" + std::to_string(config.dst.value) + ",\"compatibility\":" + std::to_string(COMPATIBLE_VERSION) + "}";
+            json = "{\"sender\":\"Wii U\",\"long\":\"" + ReplaceSlashN(GetAppTitle(ENGLISH, true)) + "\",\"app\":\"" + app + "\",\"details\":\"" + details + "\",\"time\":" + std::to_string(elapsed + (config.timeset.value * 3600)) + ",\"ctrls\":" + std::to_string(ctrls) + ",\"nnid\":\"" + nnid + "\",\"img\":\"" + (network == "pr" ? std::string("pn") : network) + "\",\"dst\":" + std::to_string(config.dst.value) + ",\"compatibility\":" + std::to_string(COMPATIBLE_VERSION) + "}";
             Broadcast(json);
             }
         }
@@ -221,6 +269,7 @@ INITIALIZE_PLUGIN() {
 
     char environment_path_buffer[0x100];
     Mocha_GetEnvironmentPath(environment_path_buffer, sizeof(environment_path_buffer));
+    ENVIRONMENT_PATH = std::string(environment_path_buffer);
     INKAY_CONFIG = std::string(environment_path_buffer) + std::string("/plugins/config/inkay.json");
     INKAY_EXISTS = std::filesystem::exists(INKAY_CONFIG);
 

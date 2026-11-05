@@ -62,7 +62,7 @@ struct Presence {
     std::string name;     // Title shown as the activity name
     std::string longName; // Full English title, used to find the icon
     std::string nnid;     // Network ID, empty to hide
-    std::string network;  // "nn", "pn" or empty, for the small icon
+    std::string network;  // "nn", "pn", "pr" (Protarium) or empty, for the small icon
     std::string realNetwork; // network actually in use, also when its icon is hidden
     int ctrls = -2;       // Controller count, -2 to hide
     long long start = 0;  // Start time in Wii U local seconds
@@ -413,9 +413,9 @@ json BuildActivity(const Presence &p) {
         activity["assets"]["large_image"] = AssetUrl("preview");
     }
 
-    // "NNID: name" under the game, "PNID: name" when connected to Pretendo
+    // "NNID: name" under the game, "PNID: name" on Pretendo and Protarium
     const std::string &net = p.realNetwork.empty() ? p.network : p.realNetwork;
-    std::string state      = p.nnid.empty() ? "" : (net == "pn" ? "PNID: " : "NNID: ") + p.nnid;
+    std::string state      = p.nnid.empty() ? "" : (net == "pn" || net == "pr" ? "PNID: " : "NNID: ") + p.nnid;
 
     // Nintendo Network / Pretendo icon, from the art assets "nn" and "pn"
     if (!p.network.empty()) {
@@ -424,7 +424,7 @@ json BuildActivity(const Presence &p) {
         if (url.empty() || url.find("/" + ORIGINAL_APP_ID + "/") != std::string::npos) url = NETWORK_ICONS + p.network + ".png";
         if (!url.empty()) {
             activity["assets"]["small_image"] = url;
-            activity["assets"]["small_text"]  = p.network == "nn" ? "Using Nintendo Network" : "Using Pretendo Network";
+            activity["assets"]["small_text"]  = p.network == "nn" ? "Using Nintendo Network" : (p.network == "pr" ? "Using Protarium Network" : "Using Pretendo Network");
         }
     }
 
