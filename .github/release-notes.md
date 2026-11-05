@@ -3,6 +3,7 @@
 This fork adds a **direct mode**: the plugin talks to Discord itself over HTTPS, so no application has to run on your computer. Your status shows up even when Discord is only open on your phone. The original computer mode is still available.
 
 ### What's new
+- v2.4.1: the presence is removed from Discord when you close an app or turn the Wii U off
 - Presence is sent straight from the Wii U using Discord's headless sessions
 - One-time login with `discord_setup.py` (Python 3, no extra packages)
 - Nintendo Network, Pretendo and **Protarium** icons; NNID / PNID shown under the game
