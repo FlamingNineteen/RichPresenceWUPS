@@ -24,6 +24,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <set>
 #include <string>
 
@@ -42,6 +43,10 @@ std::string API              = "https://discord.com/api/v10";
 const std::string ICON_REPO  = "https://raw.githubusercontent.com/flamingnineteen/richpresencewups-db/main";
 const char *USER_AGENT       = "WiiURichPresence (https://github.com/sennecaelen/RichPresenceWUPS)";
 const char *TOKEN_FILE_NAME  = "richpresence_discord.json";
+
+// The original plugin's Discord application. Its art assets ("nn", "pn",
+// "preview") are used when your own application doesn't have them.
+const std::string ORIGINAL_APP_ID = "1353248127469228074";
 
 // Refresh the access token this long before it expires.
 constexpr long long REFRESH_MARGIN = 24 * 3600;
@@ -87,6 +92,9 @@ bool titlesLoaded = false;
 std::string lastError = "Not connected yet";
 std::atomic<bool> abortRequests = false;
 std::set<std::string> rejectedFields; // activity fields Discord refused, left out from then on
+std::map<std::string, std::string> rejectedReasons;
+std::map<std::string, std::string> assetUrls; // art asset name -> image URL
+bool assetsLoaded = false;
 long long blockedUntil = 0;           // Wii U local time until which Discord asked us to wait
 
 struct Response {
@@ -322,29 +330,78 @@ std::string IconUrl(const std::string &longName) {
     return fallback;
 }
 
+/**
+ * Reads the art assets of an application (a public endpoint) so they can be
+ * used as image URLs.
+ */
+void LoadAssetsOf(const std::string &appId) {
+    Response r = Request(API + "/oauth2/applications/" + appId + "/assets");
+    if (!r.ok || r.status != 200) return;
+    try {
+        json list = json::parse(r.body);
+        if (!list.is_array()) return;
+        for (const json &asset : list) {
+            std::string name = asset.value("name", std::string());
+            std::string id   = asset.value("id", std::string());
+            // Your own application wins over the original one
+            if (!name.empty() && !id.empty() && !assetUrls.count(name)) {
+                assetUrls[name] = "https://cdn.discordapp.com/app-assets/" + appId + "/" + id + ".png";
+            }
+        }
+        assetsLoaded = true;
+    } catch (...) {
+    }
+}
+
+void LoadAssets() {
+    if (!tokens.clientId.empty()) LoadAssetsOf(tokens.clientId);
+    LoadAssetsOf(ORIGINAL_APP_ID);
+}
+
+std::string AssetUrl(const std::string &name) {
+    auto it = assetUrls.find(name);
+    return it != assetUrls.end() ? it->second : "";
+}
+
 json BuildActivity(const Presence &p) {
     json activity = {
         {"name", p.name},
         {"application_id", tokens.clientId},
         {"platform", "desktop"},
         {"type", 0},
+        {"status_display_type", 0}, // "Playing <game>" in the member list, like the original
         {"details", "Playing on the Wii U"},
         {"timestamps", {{"start", (p.start + clockOffset) * 1000}}},
         {"assets", {{"large_image", IconUrl(p.longName)}, {"large_text", p.longName}}}};
 
-    if (!p.nnid.empty()) activity["state"] = "NID: " + p.nnid;
+    // Titles that aren't in the icon database get the original "preview" image
+    if (activity["assets"]["large_image"] == ICON_REPO + "/icons/menu.jpg" && !AssetUrl("preview").empty()) {
+        activity["assets"]["large_image"] = AssetUrl("preview");
+    }
 
-    // "nn" and "pn" are art asset keys; upload images with these names to
-    // your Discord application to show them.
+    std::string state = p.nnid.empty() ? "" : "NID: " + p.nnid;
+
+    // Nintendo Network / Pretendo icon, from the art assets "nn" and "pn"
     if (!p.network.empty()) {
-        activity["assets"]["small_image"] = p.network;
+        std::string url                   = AssetUrl(p.network);
+        activity["assets"]["small_image"] = url.empty() ? p.network : url;
         activity["assets"]["small_text"]  = p.network == "nn" ? "Using Nintendo Network" : "Using Pretendo Network";
     }
 
     if (p.ctrls > -2 && p.ctrls + 1 >= 1) {
-        int size              = p.ctrls + 1;
-        activity["party"]     = {{"id", "wiiu"}, {"size", {size, size > 4 ? 8 : 4}}};
+        int size = p.ctrls + 1;
+        int max  = size > 4 ? 8 : 4;
+        if (rejectedFields.count("party")) {
+            // Discord doesn't take a party here; show it the way Discord
+            // would have: "NID: name (1 of 4)"
+            state += (state.empty() ? "" : " ") + std::string("(") + std::to_string(size) + " of " + std::to_string(max) + ")";
+        }
+        else {
+            activity["party"] = {{"id", "wiiu"}, {"size", {size, max}}, {"privacy", 1}};
+        }
     }
+
+    if (!state.empty()) activity["state"] = state;
 
     return activity;
 }
@@ -420,7 +477,10 @@ void StripRejected(json &activity) {
 
 std::string RejectedList() {
     std::string out;
-    for (const std::string &field : rejectedFields) out += (out.empty() ? "" : ", ") + field;
+    for (const std::string &field : rejectedFields) {
+        auto it = rejectedReasons.find(field);
+        out += (out.empty() ? "" : ", ") + (it != rejectedReasons.end() ? it->second : field);
+    }
     return out;
 }
 
@@ -456,6 +516,7 @@ bool UpdateUnsafe(const Presence &p) {
 
     // The first request teaches us the clock offset, which the start time needs.
     if (!titlesLoaded) LoadTitles();
+    if (!assetsLoaded) LoadAssets();
     if (!clockKnown) Request(API + "/gateway");
     if (!clockKnown) return false;
 
@@ -476,7 +537,7 @@ bool UpdateUnsafe(const Presence &p) {
     // Limited, so a problem we don't understand can't cause a burst of requests.
     for (int attempt = 0; attempt < 2 && r.status == 400; attempt++) {
         std::string path;
-        FirstError(r, path);
+        std::string reason = FirstError(r, path);
 
         if (path.rfind("token", 0) == 0 && !sessionToken.empty()) {
             sessionToken.clear(); // the session expired, start a new one
@@ -485,6 +546,10 @@ bool UpdateUnsafe(const Presence &p) {
             std::string field = FieldFromPath(path);
             if (IsRequiredField(field) || rejectedFields.count(field)) break;
             rejectedFields.insert(field);
+            rejectedReasons[field] = path.substr(13) + ": " + reason;
+
+            // Rebuild, so a refused party moves into the state text
+            activity = BuildActivity(p);
             StripRejected(activity);
         }
 
@@ -512,7 +577,7 @@ bool UpdateUnsafe(const Presence &p) {
             if (!token.empty()) sessionToken = token;
         } catch (...) {
         }
-        lastError = rejectedFields.empty() ? "" : "connected, Discord refused: " + RejectedList();
+        lastError = rejectedFields.empty() ? "" : "connected, Discord refused " + RejectedList();
         return true;
     }
 
